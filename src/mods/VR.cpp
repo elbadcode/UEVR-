@@ -118,8 +118,24 @@ std::optional<std::string> VR::initialize_openvr() {
             m_openvr->error = "OpenXR already loaded";
             return Mod::on_initialize();
         }
+  if (GetModuleHandleW(L"openvr_api.dll") == nullptr) {
+        HMODULE openvr_handle = nullptr;
+        const auto module_path = Framework::get_persistent_dir("../uevr/openvr_api.dll");
+        SetDllDirectoryW(module_path.parent_path().c_str());
+        openvr_handle = LoadLibraryExW(module_path.c_str(), nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR);
+        
+          if (GetModuleHandleW(L"openvr_api.dll") == nullptr && GetModuleHandleW( module_path.c_str() ) == nullptr) {
+        if (utility::load_module_from_current_directory(L"openvr_api.dll") == nullptr) {
+            spdlog::info("[VR] Could not load openvr_api.dll");
 
+            m_openvr->loaded = false;
+            m_openvr->error = "Could not load openvr_api.dll";
 
+            return std::nullopt;
+            }
+        }
+        else SetDllDirectoryW(nullptr);
+  }
         if (utility::load_module_from_current_directory(L"openvr_api.dll") == nullptr) {
             spdlog::info("[VR] Could not load openvr_api.dll");
 
@@ -249,6 +265,12 @@ std::optional<std::string> VR::initialize_openxr() {
     spdlog::info("[VR] Initializing OpenXR");
 
     if (GetModuleHandleW(L"openxr_loader.dll") == nullptr) {
+        HMODULE openxr_handle = nullptr;
+        const auto module_path = Framework::get_persistent_dir("../uevr/openxr_loader.dll");
+        SetDllDirectoryW(module_path.parent_path().c_str());
+        openxr_handle = LoadLibraryExW(module_path.c_str(), nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR);
+        
+          if (GetModuleHandleW(L"openxr_loader.dll") == nullptr && GetModuleHandleW(module_path.c_str()) == nullptr) {
         if (utility::load_module_from_current_directory(L"openxr_loader.dll") == nullptr) {
             spdlog::info("[VR] Could not load openxr_loader.dll");
 
@@ -256,7 +278,9 @@ std::optional<std::string> VR::initialize_openxr() {
             m_openxr->error = "Could not load openxr_loader.dll";
 
             return std::nullopt;
+            }
         }
+        else SetDllDirectoryW(nullptr);
     }
 
     if (g_framework->is_dx12()) {
