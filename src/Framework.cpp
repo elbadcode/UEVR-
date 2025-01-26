@@ -1147,9 +1147,9 @@ void Framework::draw_ui() {
             style.Alpha = 1.0f;
         } else {
             if (ImGui::IsWindowHovered(ImGuiFocusedFlags_AnyWindow)) {
-                style.Alpha = 0.9f;
-            } else {
                 style.Alpha = 0.8f;
+            } else {
+                style.Alpha = 0.6f;
             }
         }
     } else {
@@ -1516,7 +1516,7 @@ bool Framework::initialize() {
         m_first_initialize = false;
     }
 
-    if (m_frames_since_init < 60) {
+    if (m_frames_since_init < 120) {
         m_frames_since_init++;
         return false;
     }

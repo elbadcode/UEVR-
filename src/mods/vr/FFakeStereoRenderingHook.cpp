@@ -384,7 +384,7 @@ void FFakeStereoRenderingHook::attempt_hook_slate_thread(uintptr_t return_addres
         static std::future<bool> future = std::async(std::launch::async, detail::pre_find_slate_thread);
 
         // Wait for the future to be valid before attempting to hook
-        if (future.valid() && future.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        if (future.valid() && future.wait_for(std::chrono::seconds(120)) == std::future_status::ready) {
             future.get();
         } else if (future.valid()) {
             return;

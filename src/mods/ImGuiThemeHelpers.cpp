@@ -8,7 +8,7 @@ void ImGuiThemeHelper::StyleColorsDefaultDark() {
     
     // Unreal style by dev0-1 from ImThemes
     auto& style = ImGui::GetStyle();
-    style.Alpha = 1.0f;
+    style.Alpha = 0.8f;
     style.DisabledAlpha = 1.0f;
     style.WindowPadding = ImVec2(8.0f, 8.0f);
     style.WindowRounding = 0.0f;
@@ -16,9 +16,9 @@ void ImGuiThemeHelper::StyleColorsDefaultDark() {
     style.WindowMinSize = ImVec2(32.0f, 32.0f);
     style.WindowTitleAlign = ImVec2(0.0f, 0.5f);
     style.WindowMenuButtonPosition = ImGuiDir_Left;
-    style.ChildRounding = 0.0f;
+    style.ChildRounding = 4.0f;
     style.ChildBorderSize = 1.0f;
-    style.PopupRounding = 0.0f;
+    style.PopupRounding = 4.0f;
     style.PopupBorderSize = 1.0f;
     style.FramePadding = ImVec2(4.0f, 3.0f);
     style.FrameRounding = 0.0f;
@@ -31,7 +31,7 @@ void ImGuiThemeHelper::StyleColorsDefaultDark() {
     style.ScrollbarSize = 14.0f;
     style.ScrollbarRounding = 9.0f;
     style.GrabMinSize = 10.0f;
-    style.GrabRounding = 0.0f;
+    style.GrabRounding = 4.0f;
     style.TabRounding = 4.0f;
     style.TabBorderSize = 0.0f;
     style.TabMinWidthForCloseButton = 0.0f;
@@ -169,7 +169,7 @@ void ImGuiThemeHelper::StyleColorsHighContrast() {
     auto& style = ImGui::GetStyle();
     
     // Enemymouse style by enemymouse from ImThemes
-    style.Alpha = 1.0f;
+    style.Alpha = 0.8;
     style.DisabledAlpha = 0.6000000238418579f;
     style.WindowPadding = ImVec2(8.0f, 8.0f);
     style.WindowRounding = 3.0f;
