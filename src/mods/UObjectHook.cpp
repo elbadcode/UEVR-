@@ -428,11 +428,11 @@ void UObjectHook::on_post_calculate_stereo_view_offset(void* stereo_device, cons
                                                     const float world_to_meters, Vector3f* view_location, bool is_double)
 {
     if (!m_fully_hooked) {
-        return;
+        //return;
     }
 
     if (!VR::get()->is_hmd_active()) {
-        return;
+       // return;
     }
 
     if (m_uobject_hook_disabled) {
@@ -995,7 +995,7 @@ void UObjectHook::spawn_overlapper(uint32_t hand) {
 
                 if (new_sphere != nullptr) {
                     new_sphere->attach_to(mesh, L"None", 0, true);
-                    new_sphere->set_local_transform(glm::vec3{}, glm::vec4{0, 0, 0, 1}, glm::vec3{1, 1, 1});
+                    new_sphere->set_local_transform(glm::vec3{}, glm::vec4{0, 0, 0.2, 1}, glm::vec3{1, 1, 1});
 
                     std::unique_lock _{m_mutex};
                     m_spawned_spheres.insert(new_sphere);
@@ -2610,7 +2610,7 @@ void UObjectHook::ui_handle_scene_component(sdk::USceneComponent* comp) {
 
             if (ImGui::Button("Attach Camera to")) {
                 m_camera_attach.object = comp;
-                m_camera_attach.offset = glm::vec3{0.0f, 0.0f, 0.0f};
+                m_camera_attach.offset = glm::vec3{0.0f, 0.0f, 0.3f};
             }
 
             ImGui::SameLine();
@@ -3012,7 +3012,7 @@ void UObjectHook::ui_handle_actor(sdk::UObject* object) {
             ImGui::Text("Can't save, did not start from a valid base or none of the allowed bases can reach this object");
         }
 
-        if (ImGui::DragFloat3("Camera Offset", &m_camera_attach.offset.x, 0.1f)) {
+        if (ImGui::DragFloat3("Camera Offset", &m_camera_attach.offset.x, 0.3f)) {
             if (m_persistent_camera_state != nullptr) {
                 m_persistent_camera_state->offset = m_camera_attach.offset;
             }
@@ -3272,7 +3272,8 @@ void UObjectHook::ui_handle_functions(void* object, sdk::UStruct* uclass) {
 
 void UObjectHook::ui_handle_properties(void* object, sdk::UStruct* uclass) {
     auto previous_path = m_path;
-
+    // name and parent to reduce duplication
+    std::vector<std::pair<std::string, std::string>> opened_names;
     auto scope = m_path.enter("Properties");
 
     if (uclass == nullptr) {
@@ -3298,7 +3299,7 @@ void UObjectHook::ui_handle_properties(void* object, sdk::UStruct* uclass) {
     for (auto prop : sorted_fields) {
         auto propc = prop->get_class();
         const auto propc_type = propc->get_name().to_string();
-
+        
         if (object == nullptr) {
             const auto name = utility::narrow(propc->get_name().to_string());
             const auto field_name = utility::narrow(prop->get_field_name().to_string());

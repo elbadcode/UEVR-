@@ -1083,7 +1083,6 @@ private:
     bool m_show_statistics_state{false};
 
     void update_statistics_overlay(sdk::UGameEngine* engine);
-
     int m_game_frame_count{};
     int m_frame_count{};
     int m_render_frame_count{};

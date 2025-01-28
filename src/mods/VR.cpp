@@ -30,6 +30,8 @@ std::shared_ptr<VR>& VR::get() {
     return instance;
 }
 
+
+
 // Called when the mod is initialized
 std::optional<std::string> VR::clean_initialize() try {
     ZoneScopedN(__FUNCTION__);
@@ -257,24 +259,46 @@ std::optional<std::string> VR::initialize_openvr_input() {
     return std::nullopt;
 }
 
+
+
+bool free_engine_runtime()  {
+    wchar_t game_path[MAX_PATH] = L"";
+    GetModuleFileNameW(nullptr, game_path, ARRAYSIZE(game_path));
+    std::filesystem::path engine_path = game_path;
+    engine_path = engine_path.parent_path().parent_path().parent_path().parent_path() / "Engine";
+    engine_path  /= "Binaries\\ThirdParty\\OpenXR\\win64\\openxr_loader.dll";
+    auto engine_oxr = engine_path.c_str();
+    if (GetModuleHandleW(engine_oxr) != nullptr) {
+        FreeLibrary(GetModuleHandleW(engine_oxr));
+        return true;
+    }
+    else return false;
+}
+
 std::optional<std::string> VR::initialize_openxr() {
     ZoneScopedN(__FUNCTION__);
+
 
     m_openxr.reset();
     m_openxr = std::make_shared<runtimes::OpenXR>();
 
     spdlog::info("[VR] Initializing OpenXR");
 
+    if(free_engine_runtime()) {
+       spdlog::info("Freed engine runtime");
+    }
+
     if (GetModuleHandleW(L"openxr_loader.dll") == nullptr) {
         HMODULE openxr_handle = nullptr;
         // Glad that this just works
-        const auto module_path = Framework::get_persistent_dir("..\\uevr\\openxr_loader.dll");
-        // temporarily set override dir to mod path. will experiment with doing this earlier to see if we can just ignore any game engine plugins without the nullifier
-       // SetDllDirectoryW(module_path.parent_path().c_str());
-        // must use this flag to use set or add directory
+        auto module_path = Framework::get_persistent_dir("..\\uevr-nightly\\openxr_loader.dll");
+        
         openxr_handle = LoadLibraryW(module_path.c_str());
-        // one might be tempted to use GetModuleHandleExW here but that's actually for loading from memory locations
         if (GetModuleHandleW(L"openxr_loader.dll") == nullptr && GetModuleHandleW(module_path.c_str()) == nullptr) {
+            module_path = Framework::get_persistent_dir("..\\uevr\\openxr_loader.dll");
+            openxr_handle = LoadLibraryW(module_path.c_str());
+                    if (GetModuleHandleW(L"openxr_loader.dll") == nullptr && GetModuleHandleW(module_path.c_str()) == nullptr) {
+
         if (utility::load_module_from_current_directory(L"openxr_loader.dll") == nullptr) {
             spdlog::info("[VR] Could not load openxr_loader.dll");
 
@@ -282,10 +306,10 @@ std::optional<std::string> VR::initialize_openxr() {
             m_openxr->error = "Could not load openxr_loader.dll";
 
             return std::nullopt;
+                }
             }
         }
-        // unset override to restore normal dll path searching
-       // SetDllDirectoryW(nullptr);
+
     }
 
     if (g_framework->is_dx12()) {
@@ -2545,7 +2569,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         ImGui::SetNextItemOpen(true, ImGuiCond_::ImGuiCond_Once);
         if (ImGui::TreeNode("Camera Freeze")) {
             float camera_offset[] = {m_camera_forward_offset->value(), m_camera_right_offset->value(), m_camera_up_offset->value()};
-            if (ImGui::SliderFloat3("Camera Offset", camera_offset, -4000.0f, 4000.0f)) {
+            if (ImGui::SliderFloat3("Camera Offset", camera_offset, -40000.0f, 40000.0f)) {
                 m_camera_forward_offset->value() = camera_offset[0];
                 m_camera_right_offset->value() = camera_offset[1];
                 m_camera_up_offset->value() = camera_offset[2];

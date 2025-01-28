@@ -632,8 +632,6 @@ public:
     // game specific
     virtual void on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {};
     virtual void on_post_engine_tick(sdk::UGameEngine* engine, float delta) {};
-    virtual void on_pre_slate_draw_window(void* renderer, void* command_list, sdk::FViewportInfo* viewport_info) {};
-    virtual void on_post_slate_draw_window(void* renderer, void* command_list, sdk::FViewportInfo* viewport_info) {};
     virtual void on_early_calculate_stereo_view_offset(void* stereo_device, const int32_t view_index, Rotator<float>* view_rotation, 
                                                      const float world_to_meters, Vector3f* view_location, bool is_double) {};
     virtual void on_pre_calculate_stereo_view_offset(void* stereo_device, const int32_t view_index, Rotator<float>* view_rotation, 
@@ -643,6 +641,8 @@ public:
     virtual void on_pre_viewport_client_draw(void* viewport_client, void* viewport, void* canvas) {};
     virtual void on_post_viewport_client_draw(void* viewport_client, void* viewport, void* canvas) {};
 
+    virtual void on_pre_slate_draw_window(void* renderer, void* command_list, sdk::FViewportInfo* viewport_info) {};
+    virtual void on_post_slate_draw_window(void* renderer, void* command_list, sdk::FViewportInfo* viewport_info) {};
 protected:
     ValueList m_options{};
     std::vector<ModComponent*> m_components{};
