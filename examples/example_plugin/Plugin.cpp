@@ -27,6 +27,7 @@ SOFTWARE.
 #include <locale>
 #include <codecvt>
 
+#include "apitrace.hpp"
 #include <Windows.h>
 
 // only really necessary if you want to render to the screen
@@ -36,7 +37,10 @@ SOFTWARE.
 
 #include "rendering/d3d11.hpp"
 #include "rendering/d3d12.hpp"
-
+#include "..\..\include\reshade\reshade.hpp"
+#include "..\..\include\reshade\reshade_api_device.hpp"
+#include "..\..\include\reshade\reshade_events.hpp"
+#include "..\..\include\reshade\reshade_api.hpp"
 #include "uevr/Plugin.hpp"
 
 using namespace uevr;
@@ -52,14 +56,87 @@ class ExamplePlugin : public uevr::Plugin {
 public:
     ExamplePlugin() = default;
 
-    void on_dllmain() override {}
+
+void register_addon_events()
+{
+	reshade::register_event<reshade::addon_event::reshade_begin_effects>(on_reshade_begin_effects);
+}
+
+void unregister_addon_events()
+{
+	reshade::unregister_event<reshade::addon_event::reshade_begin_effects>(on_reshade_begin_effects);
+}
+static void on_reshade_begin_effects(effect_runtime *runtime, command_list *cmd_list, resource_view rtv, resource_view rtv_srgb)
+{
+	m_runtime = runtime;
+	m_cmdlist = cmd_list;
+	m_rtv = rtv;
+	m_rtv_srgb = rtv_srgb;
+}
+
+    void on_dllmain() override {
+
+  		// reshade::register_event<reshade::addon_event::init_swapchain>(apitrace->on_init_swapchain);
+		// reshade::register_event<reshade::addon_event::destroy_swapchain>(on_destroy_swapchain);
+		// reshade::register_event<reshade::addon_event::init_sampler>(on_init_sampler);
+		// reshade::register_event<reshade::addon_event::destroy_sampler>(on_destroy_sampler);
+		// reshade::register_event<reshade::addon_event::init_resource>(on_init_resource);
+		// reshade::register_event<reshade::addon_event::destroy_resource>(on_destroy_resource);
+		// reshade::register_event<reshade::addon_event::init_resource_view>(on_init_resource_view);
+		// reshade::register_event<reshade::addon_event::destroy_resource_view>(on_destroy_resource_view);
+		// reshade::register_event<reshade::addon_event::init_pipeline>(on_init_pipeline);
+		// reshade::register_event<reshade::addon_event::destroy_pipeline>(on_destroy_pipeline);
+
+		// reshade::register_event<reshade::addon_event::barrier>(on_barrier);
+		// reshade::register_event<reshade::addon_event::begin_render_pass>(on_begin_render_pass);
+		// reshade::register_event<reshade::addon_event::end_render_pass>(on_end_render_pass);
+		// reshade::register_event<reshade::addon_event::bind_render_targets_and_depth_stencil>(on_bind_render_targets_and_depth_stencil);
+		// reshade::register_event<reshade::addon_event::bind_pipeline>(on_bind_pipeline);
+		// reshade::register_event<reshade::addon_event::bind_pipeline_states>(on_bind_pipeline_states);
+		// reshade::register_event<reshade::addon_event::bind_viewports>(on_bind_viewports);
+		// reshade::register_event<reshade::addon_event::bind_scissor_rects>(on_bind_scissor_rects);
+		// reshade::register_event<reshade::addon_event::push_constants>(on_push_constants);
+		// reshade::register_event<reshade::addon_event::push_descriptors>(on_push_descriptors);
+		// reshade::register_event<reshade::addon_event::bind_descriptor_tables>(on_bind_descriptor_tables);
+		// reshade::register_event<reshade::addon_event::bind_index_buffer>(on_bind_index_buffer);
+		// reshade::register_event<reshade::addon_event::bind_vertex_buffers>(on_bind_vertex_buffers);
+		// reshade::register_event<reshade::addon_event::draw>(on_draw);
+		// reshade::register_event<reshade::addon_event::draw_indexed>(on_draw_indexed);
+		// reshade::register_event<reshade::addon_event::dispatch>(on_dispatch);
+		// reshade::register_event<reshade::addon_event::dispatch_mesh>(on_dispatch_mesh);
+		// reshade::register_event<reshade::addon_event::dispatch_rays>(on_dispatch_rays);
+		// reshade::register_event<reshade::addon_event::draw_or_dispatch_indirect>(on_draw_or_dispatch_indirect);
+		// reshade::register_event<reshade::addon_event::copy_resource>(on_copy_resource);
+		// reshade::register_event<reshade::addon_event::copy_buffer_region>(on_copy_buffer_region);
+		// reshade::register_event<reshade::addon_event::copy_buffer_to_texture>(on_copy_buffer_to_texture);
+		// reshade::register_event<reshade::addon_event::copy_texture_region>(on_copy_texture_region);
+		// reshade::register_event<reshade::addon_event::copy_texture_to_buffer>(on_copy_texture_to_buffer);
+		// reshade::register_event<reshade::addon_event::resolve_texture_region>(on_resolve_texture_region);
+		// reshade::register_event<reshade::addon_event::clear_depth_stencil_view>(on_clear_depth_stencil_view);
+		// reshade::register_event<reshade::addon_event::clear_render_target_view>(on_clear_render_target_view);
+		// reshade::register_event<reshade::addon_event::clear_unordered_access_view_uint>(on_clear_unordered_access_view_uint);
+		// reshade::register_event<reshade::addon_event::clear_unordered_access_view_float>(on_clear_unordered_access_view_float);
+		// reshade::register_event<reshade::addon_event::copy_acceleration_structure>(on_copy_acceleration_structure);
+		// reshade::register_event<reshade::addon_event::build_acceleration_structure>(on_build_acceleration_structure);
+		// reshade::register_event<reshade::addon_event::generate_mipmaps>(on_generate_mipmaps);
+		// reshade::register_event<reshade::addon_event::begin_query>(on_begin_query);
+		// reshade::register_event<reshade::addon_event::end_query>(on_end_query);
+		// reshade::register_event<reshade::addon_event::copy_query_heap_results>(on_copy_query_heap_results);
+
+	//reshade::register_event<reshade::addon_event::reshade_present>(on_present);
+
+  
+		register_addon_events();
+
+	
+    }
 
     void on_initialize() override {
         ImGui::CreateContext();
-
         API::get()->log_error("%s %s", "Hello", "error");
         API::get()->log_warn("%s %s", "Hello", "warning");
         API::get()->log_info("%s %s", "Hello", "info");
+
     }
 
     void on_present() override {
@@ -86,11 +163,13 @@ public:
             m_was_rendering_desktop = true;
 
             if (renderer_data->renderer_type == UEVR_RENDERER_D3D11) {
+                
+        if (m_runtime != nullptr) {
                 ImGui_ImplDX11_NewFrame();
                 g_d3d11.render_imgui();
             } else if (renderer_data->renderer_type == UEVR_RENDERER_D3D12) {
                 auto command_queue = (ID3D12CommandQueue*)renderer_data->command_queue;
-
+        if (m_runtime != nullptr) {
                 if (command_queue == nullptr) {
                     return;
                 }

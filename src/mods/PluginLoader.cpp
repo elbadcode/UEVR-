@@ -1845,7 +1845,8 @@ void PluginLoader::on_draw_ui() {
     }
 
     if (ImGui::Button("Reload Plugins")) {
-        attempt_unload_plugins();
+    // attempt_unload_plugins();
+    //allow load new plugins without messing up load
         reload_plugins();
     }
 

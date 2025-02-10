@@ -17,7 +17,7 @@
 #include "vr/FFakeStereoRenderingHook.hpp"
 #include "vr/RenderTargetPoolHook.hpp"
 #include "vr/CVarManager.hpp"
-
+#include "libloaderapi.h"
 #include "Mod.hpp"
 
 #undef max
@@ -922,8 +922,18 @@ private:
     const ModSlider::Ptr m_camera_forward_offset{ ModSlider::create(generate_name("CameraForwardOffset"), -4000.0f, 4000.0f, 0.0f) };
     const ModSlider::Ptr m_camera_right_offset{ ModSlider::create(generate_name("CameraRightOffset"), -4000.0f, 4000.0f, 0.0f) };
     const ModSlider::Ptr m_camera_up_offset{ ModSlider::create(generate_name("CameraUpOffset"), -4000.0f, 4000.0f, 0.0f) };
+
+// const ModSlider::Ptr m_camera_forward_offset_fine{ ModSlider::create(generate_name("CameraForwardOffsetFine"), -40.0f, 40.0f, 0.0f) };
+//     const ModSlider::Ptr m_camera_right_offset_fine{ ModSlider::create(generate_name("CameraRightOffsetFine"), -40.0f, 40.0f, 0.0f) };
+//     const ModSlider::Ptr m_camera_up_offset_fine{ ModSlider::create(generate_name("CameraUpOffsetFine"), -40.0f, 40.0f, 0.0f) };
+
+//     const ModSlider::Ptr m_camera_yaw_offset{ ModSlider::create(generate_name("CameraForwardOffsetFine"), -40.0f, 40.0f, 0.0f) };
+//     const ModSlider::Ptr m_camera_pitch_offset{ ModSlider::create(generate_name("CameraRightOffsetFine"), -40.0f, 40.0f, 0.0f) };
+//     const ModSlider::Ptr m_camera_roll_offset{ ModSlider::create(generate_name("CameraRoll"), -40.0f, 40.0f, 0.0f) };
+
+
     const ModSlider::Ptr m_camera_fov_distance_multiplier{ ModSlider::create(generate_name("CameraFOVDistanceMultiplier"), 0.00f, 1000.0f, 0.0f) };
-    const ModSlider::Ptr m_world_scale{ ModSlider::create(generate_name("WorldScale"), 0.01f, 10.0f, 1.0f) };
+    const ModSlider::Ptr m_world_scale{ ModSlider::create(generate_name("WorldScale"), 0.01f, 100.0f, 1.0f) };
     const ModSlider::Ptr m_depth_scale{ ModSlider::create(generate_name("DepthScale"), 0.01f, 1.0f, 1.0f) };
 
     const ModToggle::Ptr m_ghosting_fix{ ModToggle::create(generate_name("GhostingFix"), false) };
@@ -1193,7 +1203,6 @@ private:
                 gamepad.update.reset();
             }
         }
-
         bool headlocked_begin_held{false};
         bool menu_longpress_begin_held{false};
         std::chrono::steady_clock::time_point headlocked_begin{};

@@ -35,7 +35,7 @@ std::shared_ptr<VR>& VR::get() {
 // Called when the mod is initialized
 std::optional<std::string> VR::clean_initialize() try {
     ZoneScopedN(__FUNCTION__);
-
+    auto openxr_error = initialize_openxr();
     auto openvr_error = initialize_openvr();
 
     if (openvr_error || !m_openvr->loaded) {
@@ -48,7 +48,7 @@ std::optional<std::string> VR::clean_initialize() try {
         m_openvr->needs_pose_update = false;
 
         // Attempt to load OpenXR instead
-        auto openxr_error = initialize_openxr();
+      
 
         if (openxr_error || !m_openxr->loaded) {
             m_openxr->needs_pose_update = false;
@@ -96,15 +96,17 @@ std::optional<std::string> VR::clean_initialize() try {
 
 std::optional<std::string> VR::initialize_openvr() {
     ZoneScopedN(__FUNCTION__);
+ const auto wants_openvr = m_requested_runtime_name->value()  == "openvr_api.dll";
+     const auto wants_openxr = m_requested_runtime_name->value() == "openxr_loader.dll";
 
+    SPDLOG_INFO("[VR] Requested runtime: {}", m_requested_runtime_name->value());
+ 
     spdlog::info("Attempting to load OpenVR");
 
     m_openvr = std::make_shared<runtimes::OpenVR>();
     m_openvr->loaded = false;
 
-    const auto wants_openxr = m_requested_runtime_name->value() == "openxr_loader.dll";
 
-    SPDLOG_INFO("[VR] Requested runtime: {}", m_requested_runtime_name->value());
 
     if (wants_openxr && GetModuleHandleW(L"openxr_loader.dll") != nullptr) {
         // pre-injected
@@ -112,6 +114,10 @@ std::optional<std::string> VR::initialize_openvr() {
         m_openvr->error = "OpenXR already loaded";
         return Mod::on_initialize();
     }
+   if(!wants_openvr) {
+        return std::nullopt;
+    }
+
 
     if (GetModuleHandleW(L"openvr_api.dll") == nullptr) {
         // pre-injected
@@ -269,10 +275,9 @@ bool free_engine_runtime()  {
     engine_path  /= "Binaries\\ThirdParty\\OpenXR\\win64\\openxr_loader.dll";
     auto engine_oxr = engine_path.c_str();
     if (GetModuleHandleW(engine_oxr) != nullptr) {
-        FreeLibrary(GetModuleHandleW(engine_oxr));
-        return true;
+       return FreeLibrary(GetModuleHandleW(engine_oxr)); //success
     }
-    else return false;
+    else return true; // not loaded to begin with
 }
 
 std::optional<std::string> VR::initialize_openxr() {
@@ -285,6 +290,12 @@ std::optional<std::string> VR::initialize_openxr() {
     spdlog::info("[VR] Initializing OpenXR");
 
     if(free_engine_runtime()) {
+        if(GetModuleHandleW(L"openvr_api.dll") != nullptr) {
+            if(FreeLibrary(GetModuleHandleW(L"openvr_api.dll"))) {
+                spdlog::info("Freed OpenVR runtime");
+            }
+            spdlog::info("Freed OpenVR runtime");
+        }
        spdlog::info("Freed engine runtime");
     }
 
@@ -298,7 +309,6 @@ std::optional<std::string> VR::initialize_openxr() {
             module_path = Framework::get_persistent_dir("..\\uevr\\openxr_loader.dll");
             openxr_handle = LoadLibraryW(module_path.c_str());
                     if (GetModuleHandleW(L"openxr_loader.dll") == nullptr && GetModuleHandleW(module_path.c_str()) == nullptr) {
-
         if (utility::load_module_from_current_directory(L"openxr_loader.dll") == nullptr) {
             spdlog::info("[VR] Could not load openxr_loader.dll");
 
@@ -1246,21 +1256,73 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
             const auto right_ratio = (float)gamepad.sThumbLX / 32767.0f;
             const auto forward_ratio = (float)gamepad.sThumbLY / 32767.0f;
             const auto up_ratio = (float)gamepad.sThumbRY / 32767.0f;
+            auto  right_offset = 0.0f;
+            auto forward_offset = 0.0f;    
+            auto up_offset = 0.0f;
 
-            if (right_ratio <= -0.25f || right_ratio >= 0.25f) {
-                const auto right_offset = right_ratio * delta * 150.0f;
+            if (right_ratio < 0) {
+                if (right_ratio < -0.125f) 
+                      right_offset = right_ratio * delta;
+                else if (right_ratio < -0.25f) 
+                    right_offset = right_ratio * delta * 50.0f;
+                else if (right_ratio < -0.5f) 
+                    right_offset = right_ratio * delta * 150.0f;
                 m_camera_right_offset->value() += right_offset;
             }
 
-            if (forward_ratio <= -0.25f || forward_ratio >= 0.25f) {
-                const auto forward_offset = forward_ratio * delta * 150.0f;
+
+             if (right_ratio > 0) {
+                if (right_ratio > 0.125f) 
+                   right_offset = right_ratio * delta;
+                else if (right_ratio > 0.25f) 
+                  right_offset = right_ratio * delta * 50.0f;
+                else if (right_ratio > 0.5f) 
+                right_offset = right_ratio * delta * 150.0f;
+                m_camera_right_offset->value() += right_offset;
+            }
+
+            if (forward_ratio < 0) {
+                if (forward_ratio < -0.125f) 
+                   forward_offset = forward_ratio * delta;
+                else if (forward_ratio < -0.25f) 
+                    forward_offset = forward_ratio * delta * 50.0f;
+                else if (forward_ratio < -0.5f) 
+                   forward_offset = forward_ratio * delta * 150.0f;
                 m_camera_forward_offset->value() += forward_offset;
             }
 
-            if (up_ratio <= -0.25f || up_ratio >= 0.25f) {
-                const auto up_offset = up_ratio * delta * 150.0f;
+
+             if (forward_ratio > 0) {
+                if (forward_ratio > 0.125f) 
+                forward_offset = forward_ratio * delta;
+                else if (forward_ratio > 0.25f) 
+                forward_offset = forward_ratio * delta * 50.0f;
+                else if (forward_ratio > 0.5f) 
+                  forward_offset = forward_ratio * delta * 150.0f;
+                m_camera_forward_offset->value() += forward_offset;
+            }
+
+         if (up_ratio < 0) {
+                if (up_ratio < -0.125f) 
+                    const auto up_offset = up_ratio * delta;
+                else if (up_ratio < -0.25f) 
+                    const auto up_offset = up_ratio * delta * 50.0f;
+                else if (up_ratio < -0.5f) 
+                    const auto up_offset = up_ratio * delta * 150.0f;
                 m_camera_up_offset->value() += up_offset;
             }
+
+
+             if (up_ratio > 0) {
+                if (up_ratio > 0.125f) 
+                    const auto up_offset = up_ratio * delta;
+                else if (up_ratio > 0.25f) 
+                    const auto up_offset = up_ratio * delta * 50.0f;
+                else if (up_ratio > 0.5f) 
+                    const auto up_offset = up_ratio * delta * 150.0f;
+                m_camera_up_offset->value() += up_offset;
+            }
+
 
             if (gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) {
                 if (!m_rt_modifier.was_moving_left) {
@@ -2429,13 +2491,20 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
     }
 
     if (selected_page == PAGE_RUNTIME) {
-        if (m_has_hw_scheduling) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
-            ImGui::TextWrapped("WARNING: Hardware-accelerated GPU scheduling is enabled. This may cause the game to run slower.");
-            ImGui::TextWrapped("Go into your Windows Graphics settings and disable \"Hardware-accelerated GPU scheduling\"");
-            ImGui::PopStyleColor();
-            ImGui::TextWrapped("Note: This is only necessary if you are experiencing performance issues.");
+        if (m_is_d3d12){
+            ImGui::TextWrapped("Runtime Information (D3D12)");
         }
+        else{
+            ImGui::TextWrapped("Runtime Information (D3D11)");
+        }
+
+        // if (m_has_hw_scheduling) {
+        //     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+        //     ImGui::TextWrapped("WARNING: Hardware-accelerated GPU scheduling is enabled. This may cause the game to run slower.");
+        //     ImGui::TextWrapped("Go into your Windows Graphics settings and disable \"Hardware-accelerated GPU scheduling\"");
+        //     ImGui::PopStyleColor();
+        //     ImGui::TextWrapped("Note: This is only necessary if you are experiencing performance issues.");
+        // }
 
         if (GetModuleHandleW(L"nvngx_dlssg.dll") != nullptr) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));

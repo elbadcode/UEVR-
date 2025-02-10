@@ -78,6 +78,7 @@ void Framework::hook_monitor() {
     if (command_line != nullptr) {
         if (strstr(command_line, "d3d11") != nullptr || strstr(command_line, "dx11") != nullptr) {
             only_d3d11 = true;
+            
         }
         if (strstr(command_line, "d3d12") != nullptr || strstr(command_line, "dx12") != nullptr) {
             only_d3d12 = true;
@@ -85,6 +86,15 @@ void Framework::hook_monitor() {
     }
 
     const auto now = std::chrono::steady_clock::now();
+
+    if(only_d3d11)
+       { 
+        auto& d3d11_h = get_d3d11_hook();
+        if (d3d11_h == nullptr || !d3d11_h->is_inside_present()) {
+            hook_d3d11();
+        }
+        return;             
+    }
 
     auto& d3d11 = get_d3d11_hook();
     auto& d3d12 = get_d3d12_hook();
@@ -183,6 +193,15 @@ void Framework::command_thread() {
     if (msg.wParam == UEVRSharedMemory::MESSAGE_IDENTIFIER) {
         on_frontend_command((UEVRSharedMemory::Command)msg.lParam);
     }
+
+        // if (data->command_type == UEVRSharedMemory::CMD_SEND_STRING) {
+        // wchar_t* receivedMessage = data->message_ptr;
+        // int length = data->message_length;
+        //  std::wstring str(receivedMessage, length);
+        // SetEvent(hEvent);
+
+
+        
 }
 
 Framework::Framework(HMODULE framework_module)
@@ -515,7 +534,7 @@ void Framework::on_frame_d3d11() {
     }
 
     ComPtr<ID3D11DeviceContext> context{};
-    float clear_color[]{0.0f, 1.0f, 0.0f, 1.0f};
+    float clear_color[]{0.0f, 0.0f, 0.0f, 0.0f};
 
     m_d3d11_hook->get_device()->GetImmediateContext(&context);
     context->ClearRenderTargetView(m_d3d11.blank_rt_rtv.Get(), clear_color);

@@ -84,22 +84,35 @@ void LuaLoader::on_frame() {
 
 void LuaLoader::on_draw_sidebar_entry(std::string_view in_entry) {
     if (in_entry == "Main") {
-        if (ImGui::Button("Run script")) {
-            OPENFILENAME ofn{};
-            char file[260]{};
-
-            ofn.lStructSize = sizeof(ofn);
-            ofn.hwndOwner = g_framework->get_window();
-            ofn.lpstrFile = file;
-            ofn.nMaxFile = sizeof(file);
-            ofn.lpstrFilter = "Lua script files (*.lua)\0*.lua\0";
-            ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
-
-            if (GetOpenFileName(&ofn) != FALSE) {
-                std::scoped_lock _{ m_access_mutex };
-                m_main_state->run_script(file);
-                m_loaded_scripts.emplace_back(std::filesystem::path{file}.filename().string());
+        
+        if(Framework::on_frontend_command)
+         if (ImGui::Button("Run script")) {
+            
+           ImGui::BeginChild("script selection", ImVec2(0, 200), true);
+                for (auto&& name : m_known_scripts) {
+                    if (ImGui::Button(name.data())) {
+                        std::scoped_lock _{ m_access_mutex };
+                        m_main_state->run_script(name);
+                        m_loaded_scripts.emplace_back(name);
+                    }
+                }
             }
+          }
+        //     OPENFILENAME ofn{};
+        //     char file[260]{};
+
+        //     ofn.lStructSize = sizeof(ofn);
+        //     ofn.hwndOwner = g_framework->get_window();
+        //     ofn.lpstrFile = file;
+        //     ofn.nMaxFile = sizeof(file);
+        //     ofn.lpstrFilter = "Lua script files (*.lua)\0*.lua\0";
+        //     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+
+        //     if (GetOpenFileName(&ofn) != FALSE) {
+        //         std::scoped_lock _{ m_access_mutex };
+        //         m_main_state->run_script(file);
+        //         m_loaded_scripts.emplace_back(std::filesystem::path{file}.filename().string());
+        //     }
         }
 
         ImGui::SameLine();
@@ -192,7 +205,7 @@ void LuaLoader::on_draw_sidebar_entry(std::string_view in_entry) {
 
             for (auto&& name : m_known_scripts) {
                 if (ImGui::Checkbox(name.data(), &m_loaded_scripts_map[name])) {
-                    reset_scripts();
+                    //reset_scripts();
                     break;
                 }
             }
@@ -251,13 +264,14 @@ void LuaLoader::reset_scripts() {
     m_loaded_scripts.clear();
     m_known_scripts.clear();
 
-    const auto autorun_path = Framework::get_persistent_dir() / "scripts";
+    const auto script_dir = Framework::get_persistent_dir() / "scripts";
+    const auto autorun_dir = Framework::get_persistent_dir() / "scripts\\autorun";
 
-    spdlog::info("[LuaLoader] Creating directories {}", autorun_path.string());
-    std::filesystem::create_directories(autorun_path);
+    spdlog::info("[LuaLoader] Creating directories {}", script_dir.string());
+    std::filesystem::create_directories(script_dir);
     spdlog::info("[LuaLoader] Loading scripts...");
 
-    for (auto&& entry : std::filesystem::directory_iterator{autorun_path}) {
+    for (auto&& entry : std::filesystem::directory_iterator{script_dir}) {
         auto&& path = entry.path();
 
         if (path.has_extension() && path.extension() == ".lua") {

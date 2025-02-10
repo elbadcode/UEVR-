@@ -292,7 +292,7 @@ private:
 
     struct AdditionalFont {
         std::filesystem::path filepath{};
-        int size{16};
+        int size{13};
         std::vector<ImWchar> ranges{};
         ImFont* font{};
     };

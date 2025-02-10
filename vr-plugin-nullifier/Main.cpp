@@ -5,6 +5,7 @@
 // This has to be ran before the frontend injects openxr_loader.dll
 #include <iostream>
 #include <string_view>
+]
 
 #include <Windows.h>
 
@@ -80,6 +81,12 @@ extern "C" __declspec(dllexport) void nullify() try {
     std::cout << "[VR Plugin Nullifier] Exception thrown" << std::endl;
     g_finished = true;
 }
+
+
+
+
+
+
 
 // dllmain
 BOOL APIENTRY DllMain(HMODULE module, DWORD ul_reason_for_call, LPVOID reserved) {
