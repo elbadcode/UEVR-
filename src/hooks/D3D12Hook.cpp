@@ -91,7 +91,7 @@ bool D3D12Hook::hook() {
     spdlog::info("Dummy device: {:x}", (uintptr_t)device);
 
     // Manually get CreateDXGIFactory export because the user may be running Windows 7
-    const auto dxgi_module = LoadLibraryA("dxgi.dll");
+    const auto dxgi_module = LoadLibrary("C:\\Windows\\System32\\dxgi.dll");
     if (dxgi_module == nullptr) {
         spdlog::error("Failed to load dxgi.dll");
         return false;

@@ -1,5 +1,6 @@
-#include "../mods/VR.hpp"
 #include "FRenderTargetPoolHook.hpp"
+#include "../mods/VR.hpp"
+
 
 namespace uevr {
 void render_target_pool_hook::activate() {
@@ -18,8 +19,6 @@ UEVR_IPooledRenderTargetHandle render_target_pool_hook::get_render_target(const 
     return nullptr;
 }
 
-UEVR_FRenderTargetPoolHookFunctions render_target_pool_hook::functions {
-    .activate = &render_target_pool_hook::activate,
-    .get_render_target = &render_target_pool_hook::get_render_target
-};
-}
+UEVR_FRenderTargetPoolHookFunctions render_target_pool_hook::functions{
+    .activate = &render_target_pool_hook::activate, .get_render_target = &render_target_pool_hook::get_render_target};
+} // namespace uevr

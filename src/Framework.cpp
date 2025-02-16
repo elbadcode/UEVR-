@@ -335,7 +335,8 @@ bool Framework::hook_d3d11() {
 
 bool Framework::hook_d3d12() {
     // windows 7?
-    if (LoadLibraryA("d3d12.dll") == nullptr) {
+    if (LoadLibraryW(L"C:\\Windows\\System32\\d3d12.dll") == nullptr)  // go to system version to avoid clashes with proxy dlls
+    {
         spdlog::info("d3d12.dll not found, user is probably running Windows 7.");
         spdlog::info("Falling back to hooking D3D11.");
 

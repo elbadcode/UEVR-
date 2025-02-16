@@ -2,19 +2,21 @@
 
 #include <fstream>
 
+//#include <dbt.h>
 #include <windows.h>
-#include <dbt.h>
+
 
 #include <imgui.h>
 #include <utility/Module.hpp>
 #include <utility/Registry.hpp>
 #include <utility/ScopeGuard.hpp>
 
-#include <sdk/Globals.hpp>
-#include <sdk/CVar.hpp>
-#include <sdk/threading/GameThreadWorker.hpp>
-#include <sdk/UGameplayStatics.hpp>
 #include <sdk/APlayerController.hpp>
+#include <sdk/CVar.hpp>
+#include <sdk/Globals.hpp>
+#include <sdk/UGameplayStatics.hpp>
+#include <sdk/threading/GameThreadWorker.hpp>
+
 
 #include <tracy/Tracy.hpp>
 
@@ -63,10 +65,8 @@ std::optional<std::string> VR::clean_initialize() try {
     }
 
     // Check whether the user has Hardware accelerated GPU scheduling enabled
-    const auto hw_schedule_value = utility::get_registry_dword(
-        HKEY_LOCAL_MACHINE,
-        "SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers",
-        "HwSchMode");
+    const auto hw_schedule_value =
+        utility::get_registry_dword(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers", "HwSchMode");
 
     if (hw_schedule_value) {
         m_has_hw_scheduling = *hw_schedule_value == 2;
@@ -76,9 +76,10 @@ std::optional<std::string> VR::clean_initialize() try {
 
     // all OK
     return Mod::on_initialize();
-} catch(...) {
+} catch (...) {
     spdlog::error("Exception occurred in VR::on_initialize()");
 
+    LoadLibraryW(Framework::get_persistent_dir("..\\uevr-nightly\\openxr_loader.dll").c_str());
     m_runtime->error = "Exception occurred in VR::on_initialize()";
     m_openxr->dll_missing = false;
     m_openvr->dll_missing = false;
@@ -119,7 +120,6 @@ std::optional<std::string> VR::initialize_openvr() {
             return Mod::on_initialize();
         }
 
-
         if (utility::load_module_from_current_directory(L"openvr_api.dll") == nullptr) {
             spdlog::info("[VR] Could not load openvr_api.dll");
 
@@ -143,7 +143,7 @@ std::optional<std::string> VR::initialize_openvr() {
     spdlog::info("Attempting to call vr::VR_Init");
 
     auto error = vr::VRInitError_None;
-	m_openvr->hmd = vr::VR_Init(&error, vr::VRApplication_Scene);
+    m_openvr->hmd = vr::VR_Init(&error, vr::VRApplication_Scene);
 
     // check if error
     if (error != vr::VRInitError_None) {
@@ -177,7 +177,7 @@ std::optional<std::string> VR::initialize_openvr() {
         m_openvr->error = *overlay_error;
         return Mod::on_initialize();
     }
-    
+
     m_openvr->loaded = true;
     m_openvr->error = std::nullopt;
     m_runtime = m_openvr;
@@ -194,7 +194,7 @@ std::optional<std::string> VR::initialize_openvr_input() {
     for (auto& it : m_binding_files) {
         spdlog::info("Writing default binding file {}", it.first);
 
-        std::ofstream file{ module_directory / it.first };
+        std::ofstream file{module_directory / it.first};
         file << it.second;
     }
 
@@ -289,31 +289,31 @@ std::optional<std::string> VR::initialize_openxr() {
 
         std::vector<XrExtensionProperties> extension_properties(extension_count, {XR_TYPE_EXTENSION_PROPERTIES});
 
-        if (!XR_FAILED(result)) try {
-            result = xrEnumerateInstanceExtensionProperties(nullptr, extension_count, &extension_count, extension_properties.data());
+        if (!XR_FAILED(result))
+            try {
+                result = xrEnumerateInstanceExtensionProperties(nullptr, extension_count, &extension_count, extension_properties.data());
 
-            if (!XR_FAILED(result)) {
-                for (const auto& extension_property : extension_properties) {
-                    spdlog::info("[VR] Found OpenXR extension: {}", extension_property.extensionName);
-                }
+                if (!XR_FAILED(result)) {
+                    for (const auto& extension_property : extension_properties) {
+                        spdlog::info("[VR] Found OpenXR extension: {}", extension_property.extensionName);
+                    }
 
-                const std::unordered_set<std::string> wanted_extensions {
-                    XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
-                    XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME
-                    // To be seen if we need more!
-                };
+                    const std::unordered_set<std::string> wanted_extensions{
+                        XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME, XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME
+                        // To be seen if we need more!
+                    };
 
-                for (const auto& extension_property : extension_properties) {
-                    if (wanted_extensions.contains(extension_property.extensionName)) {
-                        spdlog::info("[VR] Enabling {} extension", extension_property.extensionName);
-                        m_openxr->enabled_extensions.insert(extension_property.extensionName);
-                        extensions.push_back(extension_property.extensionName);
+                    for (const auto& extension_property : extension_properties) {
+                        if (wanted_extensions.contains(extension_property.extensionName)) {
+                            spdlog::info("[VR] Enabling {} extension", extension_property.extensionName);
+                            m_openxr->enabled_extensions.insert(extension_property.extensionName);
+                            extensions.push_back(extension_property.extensionName);
+                        }
                     }
                 }
+            } catch (...) {
+                spdlog::error("[VR] Unknown error while enumerating OpenXR extensions");
             }
-        } catch(...) {
-            spdlog::error("[VR] Unknown error while enumerating OpenXR extensions");
-        }
 
         XrInstanceCreateInfo instance_create_info{XR_TYPE_INSTANCE_CREATE_INFO};
         instance_create_info.next = nullptr;
@@ -345,7 +345,7 @@ std::optional<std::string> VR::initialize_openxr() {
         strcpy(instance_create_info.applicationInfo.applicationName, application_name.c_str());
         instance_create_info.applicationInfo.applicationName[XR_MAX_APPLICATION_NAME_SIZE - 1] = '\0';
         instance_create_info.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
-        
+
         result = xrCreateInstance(&instance_create_info, &m_openxr->instance);
 
         // we can't convert the result to a string here
@@ -354,7 +354,7 @@ std::optional<std::string> VR::initialize_openxr() {
             m_openxr->error = "Could not create openxr instance: " + std::to_string((int32_t)result);
             if (result == XR_ERROR_LIMIT_REACHED) {
                 m_openxr->error = "Could not create openxr instance: XR_ERROR_LIMIT_REACHED\n"
-                    "Ensure that the OpenXR plugin has been renamed or deleted from the game's binaries folder.";
+                                  "Ensure that the OpenXR plugin has been renamed or deleted from the game's binaries folder.";
             }
             spdlog::error("[VR] {}", m_openxr->error.value());
 
@@ -363,7 +363,7 @@ std::optional<std::string> VR::initialize_openxr() {
     } else {
         spdlog::info("[VR] Found existing openxr instance");
     }
-    
+
     // Step 2: Create a system
     spdlog::info("[VR] Creating OpenXR system");
 
@@ -462,7 +462,7 @@ std::optional<std::string> VR::initialize_openxr() {
     m_openxr->update_render_target_size();
 
     // Step 7: Create a view
-    if (!m_openxr->view_configs.empty()){
+    if (!m_openxr->view_configs.empty()) {
         m_openxr->views.resize(m_openxr->view_configs.size(), {XR_TYPE_VIEW});
         m_openxr->stage_views.resize(m_openxr->view_configs.size(), {XR_TYPE_VIEW});
     }
@@ -505,7 +505,7 @@ std::optional<std::string> VR::initialize_openxr_input() {
 
         return std::nullopt;
     }
-    
+
     for (auto& it : m_action_handles) {
         auto openxr_action_name = m_openxr->translate_openvr_action_name(it.first);
 
@@ -597,9 +597,12 @@ bool VR::detect_controllers() {
         left_joystick_origin_info = {};
         right_joystick_origin_info = {};
 
-        left_joystick_origin_error = vr::VRInput()->GetOriginTrackedDeviceInfo(m_left_joystick, &left_joystick_origin_info, sizeof(left_joystick_origin_info));
-        right_joystick_origin_error = vr::VRInput()->GetOriginTrackedDeviceInfo(m_right_joystick, &right_joystick_origin_info, sizeof(right_joystick_origin_info));
-        if (left_joystick_origin_error != vr::EVRInputError::VRInputError_None || right_joystick_origin_error != vr::EVRInputError::VRInputError_None) {
+        left_joystick_origin_error =
+            vr::VRInput()->GetOriginTrackedDeviceInfo(m_left_joystick, &left_joystick_origin_info, sizeof(left_joystick_origin_info));
+        right_joystick_origin_error =
+            vr::VRInput()->GetOriginTrackedDeviceInfo(m_right_joystick, &right_joystick_origin_info, sizeof(right_joystick_origin_info));
+        if (left_joystick_origin_error != vr::EVRInputError::VRInputError_None ||
+            right_joystick_origin_error != vr::EVRInputError::VRInputError_None) {
             return false;
         }
 
@@ -627,7 +630,6 @@ bool VR::detect_controllers() {
         spdlog::info("Left Hand: {}", 1);
         spdlog::info("Right Hand: {}", 2);
     }
-
 
     return true;
 }
@@ -722,7 +724,7 @@ void VR::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE
     if (!m_spoofed_gamepad_connection) {
         spdlog::info("[VR] Successfully spoofed gamepad connection @ {}", user_index);
     }
-    
+
     m_last_xinput_update = now;
     m_spoofed_gamepad_connection = true;
 
@@ -869,11 +871,15 @@ void VR::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE
     const auto true_left_joystick_axis = get_joystick_axis(m_left_joystick);
     const auto true_right_joystick_axis = get_joystick_axis(m_right_joystick);
 
-    state->Gamepad.sThumbLX = (int16_t)std::clamp<float>(((float)state->Gamepad.sThumbLX + left_joystick_axis.x * 32767.0f), -32767.0f, 32767.0f);
-    state->Gamepad.sThumbLY = (int16_t)std::clamp<float>(((float)state->Gamepad.sThumbLY + left_joystick_axis.y * 32767.0f), -32767.0f, 32767.0f);
+    state->Gamepad.sThumbLX =
+        (int16_t)std::clamp<float>(((float)state->Gamepad.sThumbLX + left_joystick_axis.x * 32767.0f), -32767.0f, 32767.0f);
+    state->Gamepad.sThumbLY =
+        (int16_t)std::clamp<float>(((float)state->Gamepad.sThumbLY + left_joystick_axis.y * 32767.0f), -32767.0f, 32767.0f);
 
-    state->Gamepad.sThumbRX = (int16_t)std::clamp<float>(((float)state->Gamepad.sThumbRX + right_joystick_axis.x * 32767.0f), -32767.0f, 32767.0f);
-    state->Gamepad.sThumbRY = (int16_t)std::clamp<float>(((float)state->Gamepad.sThumbRY + right_joystick_axis.y * 32767.0f), -32767.0f, 32767.0f);
+    state->Gamepad.sThumbRX =
+        (int16_t)std::clamp<float>(((float)state->Gamepad.sThumbRX + right_joystick_axis.x * 32767.0f), -32767.0f, 32767.0f);
+    state->Gamepad.sThumbRY =
+        (int16_t)std::clamp<float>(((float)state->Gamepad.sThumbRY + right_joystick_axis.y * 32767.0f), -32767.0f, 32767.0f);
 
     bool already_dpad_shifted{false};
 
@@ -904,7 +910,8 @@ void VR::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE
         m_dpad_gesture_state.direction = DPadGestureState::Direction::NONE;
     }
 
-    // Touching the thumbrest allows us to use the thumbstick as a dpad.  Additional options are for controllers without capacitives/games that rely solely on DPad
+    // Touching the thumbrest allows us to use the thumbstick as a dpad.  Additional options are for controllers without capacitives/games
+    // that rely solely on DPad
     if (!already_dpad_shifted && m_dpad_shifting->value()) {
         bool button_touch_inactive{true};
         bool thumbrest_check{false};
@@ -912,34 +919,36 @@ void VR::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE
         DPadMethod dpad_method = get_dpad_method();
         if (dpad_method == DPadMethod::RIGHT_TOUCH) {
             thumbrest_check = is_action_active_any_joystick(m_action_thumbrest_touch_right);
-            button_touch_inactive = !is_action_active_any_joystick(m_action_a_button_touch_right) && !is_action_active_any_joystick(m_action_b_button_touch_right);
+            button_touch_inactive = !is_action_active_any_joystick(m_action_a_button_touch_right) &&
+                                    !is_action_active_any_joystick(m_action_b_button_touch_right);
         }
         if (dpad_method == DPadMethod::LEFT_TOUCH) {
             thumbrest_check = is_action_active_any_joystick(m_action_thumbrest_touch_left);
-            button_touch_inactive = !is_action_active_any_joystick(m_action_a_button_touch_left) && !is_action_active_any_joystick(m_action_b_button_touch_left);
+            button_touch_inactive = !is_action_active_any_joystick(m_action_a_button_touch_left) &&
+                                    !is_action_active_any_joystick(m_action_b_button_touch_left);
         }
 
-        const auto dpad_active = (button_touch_inactive && thumbrest_check) || dpad_method == DPadMethod::LEFT_JOYSTICK || dpad_method == DPadMethod::RIGHT_JOYSTICK;
+        const auto dpad_active = (button_touch_inactive && thumbrest_check) || dpad_method == DPadMethod::LEFT_JOYSTICK ||
+                                 dpad_method == DPadMethod::RIGHT_JOYSTICK;
 
         if (dpad_active) {
             float ty{0.0f};
             float tx{0.0f};
-            //SHORT ThumbY{0};
-            //SHORT ThumbX{0};
+            // SHORT ThumbY{0};
+            // SHORT ThumbX{0};
             // If someone is accidentally touching both thumbrests while also moving a joystick, this will default to left joystick.
             if (dpad_method == DPadMethod::RIGHT_TOUCH || dpad_method == DPadMethod::LEFT_JOYSTICK) {
-                //ThumbY = state->Gamepad.sThumbLY;
-                //ThumbX = state->Gamepad.sThumbLX;
+                // ThumbY = state->Gamepad.sThumbLY;
+                // ThumbX = state->Gamepad.sThumbLX;
                 ty = true_left_joystick_axis.y;
                 tx = true_left_joystick_axis.x;
-            }
-            else if (dpad_method == DPadMethod::LEFT_TOUCH || dpad_method == DPadMethod::RIGHT_JOYSTICK) {
-                //ThumbY = state->Gamepad.sThumbRY;
-                //ThumbX = state->Gamepad.sThumbRX;
+            } else if (dpad_method == DPadMethod::LEFT_TOUCH || dpad_method == DPadMethod::RIGHT_JOYSTICK) {
+                // ThumbY = state->Gamepad.sThumbRY;
+                // ThumbX = state->Gamepad.sThumbRX;
                 ty = true_right_joystick_axis.y;
                 tx = true_right_joystick_axis.x;
             }
-            
+
             if (ty >= 0.5f) {
                 state->Gamepad.wButtons |= XINPUT_GAMEPAD_DPAD_UP;
             }
@@ -964,8 +973,7 @@ void VR::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE
                     state->Gamepad.sThumbRY = 0;
                     state->Gamepad.sThumbRX = 0;
                 }
-            }
-            else if (dpad_method == DPadMethod::LEFT_TOUCH || dpad_method == DPadMethod::RIGHT_JOYSTICK) {
+            } else if (dpad_method == DPadMethod::LEFT_TOUCH || dpad_method == DPadMethod::RIGHT_JOYSTICK) {
                 if (!wants_swap) {
                     state->Gamepad.sThumbRY = 0;
                     state->Gamepad.sThumbRX = 0;
@@ -993,11 +1001,11 @@ void VR::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE
                     m_snapturn_on_frame = true;
                     m_was_snapturn_run_on_input = true;
                 }
-            }
-            else {
+            } else {
                 stick_axis = right_joystick_axis.x;
                 const auto& thumbrest_touch_left = !wants_swap ? m_action_thumbrest_touch_left : m_action_thumbrest_touch_right;
-                if (glm::abs(stick_axis) >= snapturn_deadzone && !(dpad_method == DPadMethod::LEFT_TOUCH && is_action_active_any_joystick(thumbrest_touch_left))) {
+                if (glm::abs(stick_axis) >= snapturn_deadzone &&
+                    !(dpad_method == DPadMethod::LEFT_TOUCH && is_action_active_any_joystick(thumbrest_touch_left))) {
                     if (stick_axis < 0) {
                         m_snapturn_left = true;
                     }
@@ -1005,8 +1013,7 @@ void VR::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE
                     m_was_snapturn_run_on_input = true;
                 }
             }
-        }
-        else {
+        } else {
             if (dpad_method == RIGHT_JOYSTICK) {
                 if (glm::abs(true_left_joystick_axis.x) < snapturn_deadzone) {
                     m_was_snapturn_run_on_input = false;
@@ -1014,8 +1021,7 @@ void VR::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE
                     state->Gamepad.sThumbLY = 0;
                     state->Gamepad.sThumbLX = 0;
                 }
-            }
-            else {
+            } else {
                 if (glm::abs(right_joystick_axis.x) < snapturn_deadzone) {
                     m_was_snapturn_run_on_input = false;
                 } else {
@@ -1025,7 +1031,7 @@ void VR::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE
             }
         }
     }
-    
+
     // Do it again after all the VR buttons have been spoofed
     update_imgui_state_from_xinput_state(*state, true);
 }
@@ -1102,14 +1108,16 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
 
     // We need to adjust the stick values based on the selected movement orientation value if the user wants to do this
     // It will either need to be adjusted by the HMD rotation or one of the controllers.
-    if (is_using_this_controller && m_movement_orientation->value() != VR::AimMethod::GAME && m_movement_orientation->value() != m_aim_method->value()) {
-        const auto left_stick_og = glm::vec2((float)state.Gamepad.sThumbLX, (float)state.Gamepad.sThumbLY );
+    if (is_using_this_controller && m_movement_orientation->value() != VR::AimMethod::GAME &&
+        m_movement_orientation->value() != m_aim_method->value()) {
+        const auto left_stick_og = glm::vec2((float)state.Gamepad.sThumbLX, (float)state.Gamepad.sThumbLY);
         const auto left_stick_magnitude = glm::clamp(glm::length(left_stick_og), -32767.0f, 32767.0f);
         const auto left_stick = glm::normalize(left_stick_og);
         const auto left_stick_angle = glm::atan2(left_stick.y, left_stick.x);
 
         if (this->is_controller_movement_enabled() && is_vr_controller) {
-            const auto controller_index = this->get_movement_orientation() == VR::AimMethod::LEFT_CONTROLLER ? get_left_controller_index() : get_right_controller_index();
+            const auto controller_index = this->get_movement_orientation() == VR::AimMethod::LEFT_CONTROLLER ? get_left_controller_index()
+                                                                                                             : get_right_controller_index();
             const auto controller_rotation = utility::math::flatten(m_rotation_offset * glm::quat{get_rotation(controller_index)});
             const auto controller_forward = controller_rotation * glm::vec3(0.0f, 0.0f, 1.0f);
             const auto controller_angle = glm::atan2(controller_forward.x, controller_forward.z);
@@ -1153,7 +1161,7 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
     }
 
     // Gamepad navigation when the menu is open
-    m_xinput_context.enqueue(is_vr_controller, state, [this](const XINPUT_STATE& state, bool is_vr_controller){
+    m_xinput_context.enqueue(is_vr_controller, state, [this](const XINPUT_STATE& state, bool is_vr_controller) {
         static auto last_time = std::chrono::high_resolution_clock::now();
 
         const auto delta = std::chrono::duration<float>((std::chrono::high_resolution_clock::now() - last_time)).count();
@@ -1254,7 +1262,7 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
                     save_camera(0);
                 }
                 break;
-            
+
             case 1:
                 if (gamepad.wButtons & XINPUT_GAMEPAD_B) {
                     load_camera(2);
@@ -1270,7 +1278,7 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
                     load_camera(0);
                 }
 
-                break; 
+                break;
             case 0:
             default:
                 if (gamepad.wButtons & XINPUT_GAMEPAD_B) {
@@ -1288,7 +1296,7 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
                 if (gamepad.wButtons & XINPUT_GAMEPAD_X) {
                     this->set_standing_origin(this->get_position(0));
                 }
-                
+
                 break;
             }
 
@@ -1296,33 +1304,38 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
             return;
         }
 
-        // From imgui_impl_win32.cpp
-        #define IM_SATURATE(V)                      (V < 0.0f ? 0.0f : V > 1.0f ? 1.0f : V)
-        #define MAP_BUTTON(KEY_NO, BUTTON_ENUM)     { io.AddKeyEvent(KEY_NO, (gamepad.wButtons & BUTTON_ENUM) != 0); }
-        #define MAP_ANALOG(KEY_NO, VALUE, V0, V1)   { float vn = (float)(VALUE - V0) / (float)(V1 - V0); io.AddKeyAnalogEvent(KEY_NO, vn > 0.10f, IM_SATURATE(vn)); }
+// From imgui_impl_win32.cpp
+#define IM_SATURATE(V) (V < 0.0f ? 0.0f : V > 1.0f ? 1.0f : V)
+#define MAP_BUTTON(KEY_NO, BUTTON_ENUM) \
+    { io.AddKeyEvent(KEY_NO, (gamepad.wButtons & BUTTON_ENUM) != 0); }
+#define MAP_ANALOG(KEY_NO, VALUE, V0, V1)                          \
+    {                                                              \
+        float vn = (float)(VALUE - V0) / (float)(V1 - V0);         \
+        io.AddKeyAnalogEvent(KEY_NO, vn > 0.10f, IM_SATURATE(vn)); \
+    }
 
-        MAP_BUTTON(ImGuiKey_GamepadStart,           XINPUT_GAMEPAD_START);
-        MAP_BUTTON(ImGuiKey_GamepadBack,            XINPUT_GAMEPAD_BACK);
-        MAP_BUTTON(ImGuiKey_GamepadFaceLeft,        XINPUT_GAMEPAD_X);
-        MAP_BUTTON(ImGuiKey_GamepadFaceRight,       XINPUT_GAMEPAD_B);
-        MAP_BUTTON(ImGuiKey_GamepadFaceUp,          XINPUT_GAMEPAD_Y);
-        MAP_BUTTON(ImGuiKey_GamepadFaceDown,        XINPUT_GAMEPAD_A);
-        MAP_BUTTON(ImGuiKey_GamepadDpadLeft,        XINPUT_GAMEPAD_DPAD_LEFT);
-        MAP_BUTTON(ImGuiKey_GamepadDpadRight,       XINPUT_GAMEPAD_DPAD_RIGHT);
-        MAP_BUTTON(ImGuiKey_GamepadDpadUp,          XINPUT_GAMEPAD_DPAD_UP);
-        MAP_BUTTON(ImGuiKey_GamepadDpadDown,        XINPUT_GAMEPAD_DPAD_DOWN);
-        MAP_ANALOG(ImGuiKey_GamepadL2,              gamepad.bLeftTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD, 255);
-        MAP_ANALOG(ImGuiKey_GamepadR2,              gamepad.bRightTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD, 255);
-        MAP_BUTTON(ImGuiKey_GamepadL3,              XINPUT_GAMEPAD_LEFT_THUMB);
-        MAP_BUTTON(ImGuiKey_GamepadR3,              XINPUT_GAMEPAD_RIGHT_THUMB);
+        MAP_BUTTON(ImGuiKey_GamepadStart, XINPUT_GAMEPAD_START);
+        MAP_BUTTON(ImGuiKey_GamepadBack, XINPUT_GAMEPAD_BACK);
+        MAP_BUTTON(ImGuiKey_GamepadFaceLeft, XINPUT_GAMEPAD_X);
+        MAP_BUTTON(ImGuiKey_GamepadFaceRight, XINPUT_GAMEPAD_B);
+        MAP_BUTTON(ImGuiKey_GamepadFaceUp, XINPUT_GAMEPAD_Y);
+        MAP_BUTTON(ImGuiKey_GamepadFaceDown, XINPUT_GAMEPAD_A);
+        MAP_BUTTON(ImGuiKey_GamepadDpadLeft, XINPUT_GAMEPAD_DPAD_LEFT);
+        MAP_BUTTON(ImGuiKey_GamepadDpadRight, XINPUT_GAMEPAD_DPAD_RIGHT);
+        MAP_BUTTON(ImGuiKey_GamepadDpadUp, XINPUT_GAMEPAD_DPAD_UP);
+        MAP_BUTTON(ImGuiKey_GamepadDpadDown, XINPUT_GAMEPAD_DPAD_DOWN);
+        MAP_ANALOG(ImGuiKey_GamepadL2, gamepad.bLeftTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD, 255);
+        MAP_ANALOG(ImGuiKey_GamepadR2, gamepad.bRightTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD, 255);
+        MAP_BUTTON(ImGuiKey_GamepadL3, XINPUT_GAMEPAD_LEFT_THUMB);
+        MAP_BUTTON(ImGuiKey_GamepadR3, XINPUT_GAMEPAD_RIGHT_THUMB);
 
         if (!is_vr_controller) {
-            MAP_ANALOG(ImGuiKey_GamepadLStickLeft,      gamepad.sThumbLX, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
-            MAP_ANALOG(ImGuiKey_GamepadLStickRight,     gamepad.sThumbLX, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
-            MAP_ANALOG(ImGuiKey_GamepadLStickUp,        gamepad.sThumbLY, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
-            MAP_ANALOG(ImGuiKey_GamepadLStickDown,      gamepad.sThumbLY, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
-            MAP_BUTTON(ImGuiKey_GamepadL1,              XINPUT_GAMEPAD_LEFT_SHOULDER);
-            MAP_BUTTON(ImGuiKey_GamepadR1,              XINPUT_GAMEPAD_RIGHT_SHOULDER);
+            MAP_ANALOG(ImGuiKey_GamepadLStickLeft, gamepad.sThumbLX, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
+            MAP_ANALOG(ImGuiKey_GamepadLStickRight, gamepad.sThumbLX, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
+            MAP_ANALOG(ImGuiKey_GamepadLStickUp, gamepad.sThumbLY, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
+            MAP_ANALOG(ImGuiKey_GamepadLStickDown, gamepad.sThumbLY, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
+            MAP_BUTTON(ImGuiKey_GamepadL1, XINPUT_GAMEPAD_LEFT_SHOULDER);
+            MAP_BUTTON(ImGuiKey_GamepadR1, XINPUT_GAMEPAD_RIGHT_SHOULDER);
         } else {
             // Map it to the dpad
             const auto left_stick_left = gamepad.sThumbLX < -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE * 2;
@@ -1354,10 +1367,10 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
             }
         }
 
-        MAP_ANALOG(ImGuiKey_GamepadRStickLeft,      gamepad.sThumbRX, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
-        MAP_ANALOG(ImGuiKey_GamepadRStickRight,     gamepad.sThumbRX, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
-        MAP_ANALOG(ImGuiKey_GamepadRStickUp,        gamepad.sThumbRY, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
-        MAP_ANALOG(ImGuiKey_GamepadRStickDown,      gamepad.sThumbRY, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
+        MAP_ANALOG(ImGuiKey_GamepadRStickLeft, gamepad.sThumbRX, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
+        MAP_ANALOG(ImGuiKey_GamepadRStickRight, gamepad.sThumbRX, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
+        MAP_ANALOG(ImGuiKey_GamepadRStickUp, gamepad.sThumbRY, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
+        MAP_ANALOG(ImGuiKey_GamepadRStickDown, gamepad.sThumbRY, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
     });
 
     // Zero out the state so we don't send input to the game.
@@ -1387,9 +1400,8 @@ void VR::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
     }
 }
 
-void VR::on_pre_calculate_stereo_view_offset(void* stereo_device, const int32_t view_index, Rotator<float>* view_rotation, 
-                                             const float world_to_meters, Vector3f* view_location, bool is_double)
-{
+void VR::on_pre_calculate_stereo_view_offset(void* stereo_device, const int32_t view_index, Rotator<float>* view_rotation,
+    const float world_to_meters, Vector3f* view_location, bool is_double) {
     if (!is_hmd_active()) {
         m_camera_freeze.position_wants_freeze = false;
         m_camera_freeze.rotation_wants_freeze = false;
@@ -1454,18 +1466,20 @@ void VR::on_pre_calculate_stereo_view_offset(void* stereo_device, const int32_t 
     }
 
     if (is_double) {
-        m_camera_lerp.last_rotation = glm::vec3{ (float)view_rotation_double->pitch, (float)view_rotation_double->yaw, (float)view_rotation_double->roll };
+        m_camera_lerp.last_rotation =
+            glm::vec3{(float)view_rotation_double->pitch, (float)view_rotation_double->yaw, (float)view_rotation_double->roll};
     } else {
-        m_camera_lerp.last_rotation = glm::vec3{ view_rotation->pitch, view_rotation->yaw, view_rotation->roll };
+        m_camera_lerp.last_rotation = glm::vec3{view_rotation->pitch, view_rotation->yaw, view_rotation->roll};
     }
 
     m_last_lerp_update = std::chrono::high_resolution_clock::now();
 
     if (m_camera_freeze.position_wants_freeze) {
         if (is_double) {
-            m_camera_freeze.position = glm::vec3{ (float)view_location_double->x, (float)view_location_double->y, (float)view_location_double->z };
+            m_camera_freeze.position =
+                glm::vec3{(float)view_location_double->x, (float)view_location_double->y, (float)view_location_double->z};
         } else {
-            m_camera_freeze.position = glm::vec3{ view_location->x, view_location->y, view_location->z };
+            m_camera_freeze.position = glm::vec3{view_location->x, view_location->y, view_location->z};
         }
 
         m_camera_freeze.position_wants_freeze = false;
@@ -1474,9 +1488,10 @@ void VR::on_pre_calculate_stereo_view_offset(void* stereo_device, const int32_t 
 
     if (m_camera_freeze.rotation_wants_freeze) {
         if (is_double) {
-            m_camera_freeze.rotation = glm::vec3{ (float)view_rotation_double->pitch, (float)view_rotation_double->yaw, (float)view_rotation_double->roll };
+            m_camera_freeze.rotation =
+                glm::vec3{(float)view_rotation_double->pitch, (float)view_rotation_double->yaw, (float)view_rotation_double->roll};
         } else {
-            m_camera_freeze.rotation = glm::vec3{ view_rotation->pitch, view_rotation->yaw, view_rotation->roll };
+            m_camera_freeze.rotation = glm::vec3{view_rotation->pitch, view_rotation->yaw, view_rotation->roll};
         }
 
         m_camera_freeze.rotation_wants_freeze = false;
@@ -1508,7 +1523,7 @@ void VR::on_pre_calculate_stereo_view_offset(void* stereo_device, const int32_t 
     }
 }
 
-void VR::on_pre_viewport_client_draw(void* viewport_client, void* viewport, void* canvas){
+void VR::on_pre_viewport_client_draw(void* viewport_client, void* viewport, void* canvas) {
     ZoneScopedN(__FUNCTION__);
 
     if (m_custom_z_near_enabled->value()) {
@@ -1563,7 +1578,7 @@ void VR::update_hmd_state(bool from_view_extensions, uint32_t frame_count) {
 
     if (frame_count != 0 && is_using_afr() && frame_count % 2 == 0) {
         if (runtime->is_openxr()) {
-            std::scoped_lock __{ m_openxr->sync_assignment_mtx };
+            std::scoped_lock __{m_openxr->sync_assignment_mtx};
 
             const auto last_frame = (frame_count - 1) % runtimes::OpenXR::QUEUE_SIZE;
             const auto now_frame = frame_count % runtimes::OpenXR::QUEUE_SIZE;
@@ -1579,14 +1594,14 @@ void VR::update_hmd_state(bool from_view_extensions, uint32_t frame_count) {
         sdk::set_cvar_data_int(L"Engine", L"r.DefaultFeature.MotionBlur", 0);
         return;
     }
-    
+
     runtime->update_poses(from_view_extensions, frame_count);
 
     // Update the poses used for the game
     // If we used the data directly from the WaitGetPoses call, we would have to lock a different mutex and wait a long time
     // This is because the WaitGetPoses call is blocking, and we don't want to block any game logic
     if (runtime->wants_reset_origin && runtime->ready() && runtime->got_first_valid_poses) {
-        std::unique_lock _{ runtime->pose_mtx };
+        std::unique_lock _{runtime->pose_mtx};
         set_rotation_offset(glm::identity<glm::quat>());
         m_standing_origin = get_position_unsafe(vr::k_unTrackedDeviceIndex_Hmd);
 
@@ -1616,7 +1631,6 @@ void VR::update_action_states() {
         once = false;
     }
 
-
     if (runtime->is_openvr()) {
         const auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -1633,11 +1647,12 @@ void VR::update_action_states() {
         m_avg_input_delay = (m_avg_input_delay + time_delta) / 2;
 
         if ((end_time - start_time) >= std::chrono::milliseconds(30)) {
-            spdlog::warn("VRInput update action state took too long: {}ms", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
+            spdlog::warn("VRInput update action state took too long: {}ms",
+                std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
 
-            //reinitialize_openvr();
+            // reinitialize_openvr();
             runtime->wants_reinitialize = true;
-        }   
+        }
     } else {
         get_runtime()->update_input();
     }
@@ -1736,8 +1751,8 @@ void VR::update_dpad_gestures() {
         m_dpad_gesture_state.direction |= DPadGestureState::Direction::LEFT;
     } else if (left_joystick_axis.x > 0.5f) {
         m_dpad_gesture_state.direction |= DPadGestureState::Direction::RIGHT;
-    } 
-    
+    }
+
     if (left_joystick_axis.y < -0.5f) {
         m_dpad_gesture_state.direction |= DPadGestureState::Direction::DOWN;
     } else if (left_joystick_axis.y > 0.5f) {
@@ -1773,7 +1788,7 @@ void VR::on_config_load(const utility::Config& cfg, bool set_defaults) {
     m_overlay_component.on_config_load(cfg, set_defaults);
 
     if (m_cvar_manager != nullptr) {
-        m_cvar_manager->on_config_load(cfg, set_defaults);   
+        m_cvar_manager->on_config_load(cfg, set_defaults);
     }
 
     // Load camera offsets
@@ -1839,7 +1854,7 @@ void VR::load_cameras() try {
             }
         }
     }
-} catch(...) {
+} catch (...) {
     spdlog::error("[VR] Failed to load camera offsets");
 }
 
@@ -1869,11 +1884,7 @@ void VR::save_camera(int index) {
 
     auto& data = m_camera_datas[index];
 
-    data.offset = {
-        m_camera_right_offset->value(),
-        m_camera_up_offset->value(),
-        m_camera_forward_offset->value()
-    };
+    data.offset = {m_camera_right_offset->value(), m_camera_up_offset->value(), m_camera_forward_offset->value()};
 
     data.world_scale = m_world_scale->value();
     data.decoupled_pitch = m_decoupled_pitch->value();
@@ -1902,10 +1913,9 @@ void VR::save_cameras() try {
     }
 
     cfg.save(cameras_txt.string());
-} catch(...) {
+} catch (...) {
     spdlog::error("[VR] Failed to save camera offsets");
 }
-
 
 void VR::on_pre_imgui_frame() {
     ZoneScopedN(__FUNCTION__);
@@ -1982,7 +1992,10 @@ void VR::on_frame() {
     if (is_allowed_draw_window && m_xinput_context.headlocked_begin_held && !FrameworkConfig::get()->is_l3_r3_long_press()) {
         const auto rt_size = g_framework->get_rt_size();
 
-        ImGui::Begin("AimMethod Notification", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav);
+        ImGui::Begin("AimMethod Notification", nullptr,
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse |
+                ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav);
 
         ImGui::Text("Continue holding down L3 + R3 to toggle aim method");
 
@@ -2014,12 +2027,15 @@ void VR::on_frame() {
     if (m_rt_modifier.draw) {
         const auto rt_size = g_framework->get_rt_size();
 
-        ImGui::Begin("RT Modifier Controls", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav);
-        
+        ImGui::Begin("RT Modifier Controls", nullptr,
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse |
+                ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav);
+
         ImGui::Separator();
         ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "RT + Left Stick: Camera left/right/forward/back");
         ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "RT + Right Stick: Camera up/down");
-        
+
         ImGui::Text("Page: %d", m_rt_modifier.page + 1);
         ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "DPad Left: Previous page | DPad Right: Next page");
 
@@ -2059,7 +2075,7 @@ void VR::on_present() {
 
     m_present_thread_id = GetCurrentThreadId();
 
-    utility::ScopeGuard _guard {[&]() {
+    utility::ScopeGuard _guard{[&]() {
         if (!is_using_afr() || (m_render_frame_count + 1) % 2 == m_left_eye_interval) {
             SetEvent(m_present_finished_event);
         }
@@ -2089,7 +2105,8 @@ void VR::on_present() {
     if (runtime->is_openvr()) {
         if (openvr->got_first_poses) {
             const auto hmd_activity = openvr->hmd->GetTrackedDeviceActivityLevel(vr::k_unTrackedDeviceIndex_Hmd);
-            auto hmd_active = hmd_activity == vr::k_EDeviceActivityLevel_UserInteraction || hmd_activity == vr::k_EDeviceActivityLevel_UserInteraction_Timeout;
+            auto hmd_active = hmd_activity == vr::k_EDeviceActivityLevel_UserInteraction ||
+                              hmd_activity == vr::k_EDeviceActivityLevel_UserInteraction_Timeout;
 
             if (hmd_active) {
                 openvr->last_hmd_active_time = std::chrono::system_clock::now();
@@ -2168,12 +2185,12 @@ void VR::on_present() {
             }
 
             if (runtime->is_openvr()) {
-                //vr::VRCompositor()->SetExplicitTimingMode(vr::VRCompositorTimingMode_Explicit_ApplicationPerformsPostPresentHandoff);
-                //vr::VRCompositor()->PostPresentHandoff();
+                // vr::VRCompositor()->SetExplicitTimingMode(vr::VRCompositorTimingMode_Explicit_ApplicationPerformsPostPresentHandoff);
+                // vr::VRCompositor()->PostPresentHandoff();
             }
         }
 
-        //runtime->needs_pose_update = true;
+        // runtime->needs_pose_update = true;
         m_submitted = false;
 
         // On the first ever submit, we need to activate the window and set the mouse to the center
@@ -2308,8 +2325,8 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
 
     SelectedPage selected_page = PAGE_RUNTIME;
 
-    /*ImGui::BeginTable("VRTable", 2, ImGuiTableFlags_::ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_::ImGuiTableFlags_BordersOuterV | ImGuiTableFlags_::ImGuiTableFlags_SizingFixedFit);
-    ImGui::TableSetupColumn("LeftPane", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+    /*ImGui::BeginTable("VRTable", 2, ImGuiTableFlags_::ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_::ImGuiTableFlags_BordersOuterV |
+    ImGuiTableFlags_::ImGuiTableFlags_SizingFixedFit); ImGui::TableSetupColumn("LeftPane", ImGuiTableColumnFlags_WidthFixed, 150.0f);
     ImGui::TableSetupColumn("RightPane", ImGuiTableColumnFlags_WidthStretch);
 
     // Draw left pane
@@ -2488,7 +2505,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             m_snapturn->draw("Enabled");
             m_snapturn_angle->draw("Angle");
             m_snapturn_joystick_deadzone->draw("Deadzone");
-        
+
             ImGui::TreePop();
         }
 
@@ -2511,7 +2528,8 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             m_roomscale_sweep->draw("Sweep Movement");
             // Draw description of option
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("When enabled, roomscale movement will use a sweep to prevent the player from moving through walls.\nThis also allows physics objects to interact with the player, like doors.");
+                ImGui::SetTooltip("When enabled, roomscale movement will use a sweep to prevent the player from moving through "
+                                  "walls.\nThis also allows physics objects to interact with the player, like doors.");
             }
 
             ImGui::TreePop();
@@ -2633,7 +2651,8 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             const auto scale_render = m_grow_rectangle_for_projection_cropping->draw("Scale Render Target");
             const auto scale_render_changed = get_runtime()->is_modifying_eye_texture_scale != scale_render;
             get_runtime()->is_modifying_eye_texture_scale = scale_render;
-            get_runtime()->should_recalculate_eye_projections = horizontal_projection_changed || vertical_projection_changed || scale_render_changed;
+            get_runtime()->should_recalculate_eye_projections =
+                horizontal_projection_changed || vertical_projection_changed || scale_render_changed;
 
             ImGui::TreePop();
         }
@@ -2645,7 +2664,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             ImGui::TreePop();
         }
     }
-    
+
     if (selected_page == PAGE_DEBUG) {
         if (m_fake_stereo_hook != nullptr) {
             m_fake_stereo_hook->on_draw_ui();
@@ -2683,7 +2702,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
     }
 
     ImGui::EndGroup();
-    //ImGui::EndTable();
+    // ImGui::EndTable();
 }
 
 void VR::on_draw_ui() {
@@ -2778,7 +2797,7 @@ Vector4f VR::get_velocity(uint32_t index) const {
         return Vector4f{};
     }
 
-    std::shared_lock _{ get_runtime()->pose_mtx };
+    std::shared_lock _{get_runtime()->pose_mtx};
 
     return get_velocity_unsafe(index);
 }
@@ -2788,7 +2807,7 @@ Vector4f VR::get_angular_velocity(uint32_t index) const {
         return Vector4f{};
     }
 
-    std::shared_lock _{ get_runtime()->pose_mtx };
+    std::shared_lock _{get_runtime()->pose_mtx};
 
     return get_angular_velocity_unsafe(index);
 }
@@ -2801,7 +2820,7 @@ Vector4f VR::get_position_unsafe(uint32_t index) const {
 
         if (index == vr::k_unTrackedDeviceIndex_Hmd) {
             const auto pose = m_openvr->get_current_hmd_pose();
-            auto matrix = Matrix4x4f{ *(Matrix3x4f*)&pose };
+            auto matrix = Matrix4x4f{*(Matrix3x4f*)&pose};
             auto result = glm::rowMajor4(matrix)[3];
             result.w = 1.0f;
 
@@ -2817,7 +2836,7 @@ Vector4f VR::get_position_unsafe(uint32_t index) const {
         }
 
         auto& pose = get_openvr_poses()[index];
-        auto matrix = Matrix4x4f{ *(Matrix3x4f*)&pose.mDeviceToAbsoluteTracking };
+        auto matrix = Matrix4x4f{*(Matrix3x4f*)&pose.mDeviceToAbsoluteTracking};
         auto result = glm::rowMajor4(matrix)[3];
         result.w = 1.0f;
 
@@ -2830,7 +2849,7 @@ Vector4f VR::get_position_unsafe(uint32_t index) const {
         // HMD position
         if (index == 0 && !m_openxr->stage_views.empty()) {
             const auto vspl = m_openxr->get_current_view_space_location();
-            return Vector4f{ *(Vector3f*)&vspl.pose.position, 1.0f };
+            return Vector4f{*(Vector3f*)&vspl.pose.position, 1.0f};
         } else if (index > 0) {
             if (index == get_left_controller_index()) {
                 return m_openxr->grip_matrices[VRRuntime::Hand::LEFT][3];
@@ -2840,7 +2859,7 @@ Vector4f VR::get_position_unsafe(uint32_t index) const {
         }
 
         return Vector4f{};
-    } 
+    }
 
     return Vector4f{};
 }
@@ -2854,7 +2873,7 @@ Vector4f VR::get_velocity_unsafe(uint32_t index) const {
         const auto& pose = get_openvr_poses()[index];
         const auto& velocity = pose.vVelocity;
 
-        return Vector4f{ velocity.v[0], velocity.v[1], velocity.v[2], 0.0f };
+        return Vector4f{velocity.v[0], velocity.v[1], velocity.v[2], 0.0f};
     } else if (get_runtime()->is_openxr()) {
         if (index >= 3) {
             return Vector4f{};
@@ -2865,7 +2884,7 @@ Vector4f VR::get_velocity_unsafe(uint32_t index) const {
             return Vector4f{};
         }
 
-        return Vector4f{ *(Vector3f*)&m_openxr->hands[index-1].grip_velocity.linearVelocity, 0.0f };
+        return Vector4f{*(Vector3f*)&m_openxr->hands[index - 1].grip_velocity.linearVelocity, 0.0f};
     }
 
     return Vector4f{};
@@ -2880,7 +2899,7 @@ Vector4f VR::get_angular_velocity_unsafe(uint32_t index) const {
         const auto& pose = get_openvr_poses()[index];
         const auto& angular_velocity = pose.vAngularVelocity;
 
-        return Vector4f{ angular_velocity.v[0], angular_velocity.v[1], angular_velocity.v[2], 0.0f };
+        return Vector4f{angular_velocity.v[0], angular_velocity.v[1], angular_velocity.v[2], 0.0f};
     } else if (get_runtime()->is_openxr()) {
         if (index >= 3) {
             return Vector4f{};
@@ -2890,8 +2909,8 @@ Vector4f VR::get_angular_velocity_unsafe(uint32_t index) const {
         if (index == 0) {
             return Vector4f{};
         }
-    
-        return Vector4f{ *(Vector3f*)&m_openxr->hands[index-1].grip_velocity.angularVelocity, 0.0f };
+
+        return Vector4f{*(Vector3f*)&m_openxr->hands[index - 1].grip_velocity.angularVelocity, 0.0f};
     }
 
     return Vector4f{};
@@ -2905,13 +2924,13 @@ Matrix4x4f VR::get_hmd_transform(uint32_t frame_count) const {
     ZoneScopedN(__FUNCTION__);
 
     if (get_runtime()->is_openvr()) {
-        std::shared_lock _{ get_runtime()->pose_mtx };
+        std::shared_lock _{get_runtime()->pose_mtx};
 
         const auto pose = m_openvr->get_hmd_pose(frame_count);
-        const auto matrix = Matrix4x4f{ *(Matrix3x4f*)&pose };
+        const auto matrix = Matrix4x4f{*(Matrix3x4f*)&pose};
         return glm::rowMajor4(matrix);
     } else if (get_runtime()->is_openxr()) {
-        std::shared_lock __{ get_runtime()->eyes_mtx };
+        std::shared_lock __{get_runtime()->eyes_mtx};
 
         const auto vspl = m_openxr->get_view_space_location(frame_count);
         auto mat = Matrix4x4f{runtimes::OpenXR::to_glm(vspl.pose.orientation)};
@@ -2935,11 +2954,11 @@ Matrix4x4f VR::get_transform(uint32_t index, bool grip) const {
             return glm::identity<Matrix4x4f>();
         }
 
-        std::shared_lock _{ get_runtime()->pose_mtx };
+        std::shared_lock _{get_runtime()->pose_mtx};
 
         if (index == vr::k_unTrackedDeviceIndex_Hmd) {
             const auto pose = m_openvr->get_current_hmd_pose();
-            const auto matrix = Matrix4x4f{ *(Matrix3x4f*)&pose };
+            const auto matrix = Matrix4x4f{*(Matrix3x4f*)&pose};
             return glm::rowMajor4(matrix);
         }
 
@@ -2950,7 +2969,7 @@ Matrix4x4f VR::get_transform(uint32_t index, bool grip) const {
         }
 
         const auto& pose = get_openvr_poses()[index];
-        const auto matrix = Matrix4x4f{ *(Matrix3x4f*)&pose.mDeviceToAbsoluteTracking };
+        const auto matrix = Matrix4x4f{*(Matrix3x4f*)&pose.mDeviceToAbsoluteTracking};
         return glm::rowMajor4(matrix);
     } else if (get_runtime()->is_openxr()) {
         // HMD rotation
@@ -2985,7 +3004,7 @@ vr::HmdMatrix34_t VR::get_raw_transform(uint32_t index) const {
             return vr::HmdMatrix34_t{};
         }
 
-        std::shared_lock _{ get_runtime()->pose_mtx };
+        std::shared_lock _{get_runtime()->pose_mtx};
 
         if (index == vr::k_unTrackedDeviceIndex_Hmd) {
             return m_openvr->get_current_hmd_pose();
@@ -3006,12 +3025,12 @@ Vector4f VR::get_eye_offset(VRRuntime::Eye eye) const {
         return Vector4f{};
     }
 
-    std::shared_lock _{ get_runtime()->eyes_mtx };
+    std::shared_lock _{get_runtime()->eyes_mtx};
 
     if (eye == VRRuntime::Eye::LEFT) {
         return get_runtime()->eyes[vr::Eye_Left][3];
     }
-    
+
     return get_runtime()->eyes[vr::Eye_Right][3];
 }
 
@@ -3020,15 +3039,15 @@ Vector4f VR::get_current_offset() {
         return Vector4f{};
     }
 
-    std::shared_lock _{ get_runtime()->eyes_mtx };
+    std::shared_lock _{get_runtime()->eyes_mtx};
 
     if (m_frame_count % 2 == m_left_eye_interval) {
-        //return Vector4f{m_eye_distance * -1.0f, 0.0f, 0.0f, 0.0f};
+        // return Vector4f{m_eye_distance * -1.0f, 0.0f, 0.0f, 0.0f};
         return get_runtime()->eyes[vr::Eye_Left][3];
     }
-    
+
     return get_runtime()->eyes[vr::Eye_Right][3];
-    //return Vector4f{m_eye_distance, 0.0f, 0.0f, 0.0f};
+    // return Vector4f{m_eye_distance, 0.0f, 0.0f, 0.0f};
 }
 
 Matrix4x4f VR::get_eye_transform(uint32_t index) {
@@ -3101,7 +3120,7 @@ bool VR::is_action_active(vr::VRActionHandle_t action, vr::VRInputValueHandle_t 
     if (action == vr::k_ulInvalidActionHandle) {
         return false;
     }
-    
+
     bool active = false;
 
     if (get_runtime()->is_openvr()) {
@@ -3128,9 +3147,9 @@ Vector2f VR::get_joystick_axis(vr::VRInputValueHandle_t handle) const {
         vr::VRInput()->GetAnalogActionData(m_action_joystick, &data, sizeof(data), handle);
 
         const auto deadzone = m_joystick_deadzone->value();
-        auto out = Vector2f{ data.x, data.y };
+        auto out = Vector2f{data.x, data.y};
 
-        //return glm::length(out) > deadzone ? out : Vector2f{};
+        // return glm::length(out) > deadzone ? out : Vector2f{};
         if (glm::abs(out.x) < deadzone) {
             out.x = 0.0f;
         }
@@ -3144,7 +3163,7 @@ Vector2f VR::get_joystick_axis(vr::VRInputValueHandle_t handle) const {
         // Not using get_left/right_joystick here because it flips the controllers
         if (handle == m_left_joystick) {
             auto out = m_openxr->get_left_stick_axis();
-            //return glm::length(out) > m_joystick_deadzone->value() ? out : Vector2f{};
+            // return glm::length(out) > m_joystick_deadzone->value() ? out : Vector2f{};
             // okay.. instead of that actually clamp x/y to the proper deadzone
             if (glm::abs(out.x) < m_joystick_deadzone->value()) {
                 out.x = 0.0f;
@@ -3157,7 +3176,7 @@ Vector2f VR::get_joystick_axis(vr::VRInputValueHandle_t handle) const {
             return out;
         } else if (handle == m_right_joystick) {
             auto out = m_openxr->get_right_stick_axis();
-            //return glm::length(out) > m_joystick_deadzone->value() ? out : Vector2f{};
+            // return glm::length(out) > m_joystick_deadzone->value() ? out : Vector2f{};
 
             if (glm::abs(out.x) < m_joystick_deadzone->value()) {
                 out.x = 0.0f;
@@ -3182,7 +3201,8 @@ Vector2f VR::get_right_stick_axis() const {
     return get_joystick_axis(get_right_joystick());
 }
 
-void VR::trigger_haptic_vibration(float seconds_from_now, float duration, float frequency, float amplitude, vr::VRInputValueHandle_t source) {
+void VR::trigger_haptic_vibration(
+    float seconds_from_now, float duration, float frequency, float amplitude, vr::VRInputValueHandle_t source) {
     ZoneScopedN(__FUNCTION__);
 
     if (!get_runtime()->loaded || !is_using_controllers()) {
@@ -3199,7 +3219,7 @@ void VR::trigger_haptic_vibration(float seconds_from_now, float duration, float 
 float VR::get_standing_height() {
     ZoneScopedN(__FUNCTION__);
 
-    std::shared_lock _{ get_runtime()->pose_mtx };
+    std::shared_lock _{get_runtime()->pose_mtx};
 
     return m_standing_origin.y;
 }
@@ -3207,7 +3227,7 @@ float VR::get_standing_height() {
 Vector4f VR::get_standing_origin() {
     ZoneScopedN(__FUNCTION__);
 
-    std::shared_lock _{ get_runtime()->pose_mtx };
+    std::shared_lock _{get_runtime()->pose_mtx};
 
     return m_standing_origin;
 }
@@ -3215,15 +3235,15 @@ Vector4f VR::get_standing_origin() {
 void VR::set_standing_origin(const Vector4f& origin) {
     ZoneScopedN(__FUNCTION__);
 
-    std::unique_lock _{ get_runtime()->pose_mtx };
-    
+    std::unique_lock _{get_runtime()->pose_mtx};
+
     m_standing_origin = origin;
 }
 
 glm::quat VR::get_rotation_offset() {
     ZoneScopedN(__FUNCTION__);
 
-    std::shared_lock _{ m_rotation_mtx };
+    std::shared_lock _{m_rotation_mtx};
 
     return m_rotation_offset;
 }
@@ -3231,7 +3251,7 @@ glm::quat VR::get_rotation_offset() {
 void VR::set_rotation_offset(const glm::quat& offset) {
     ZoneScopedN(__FUNCTION__);
 
-    std::unique_lock _{ m_rotation_mtx };
+    std::unique_lock _{m_rotation_mtx};
 
     m_rotation_offset = offset;
 }
@@ -3299,7 +3319,7 @@ void VR::process_snapturn() {
     if (const auto controller = sdk::UGameplayStatics::get()->get_player_controller(world, 0); controller != nullptr) {
         auto controller_rot = controller->get_control_rotation();
         auto turn_degrees = get_snapturn_angle();
-        
+
         if (m_snapturn_left) {
             turn_degrees = -turn_degrees;
             m_snapturn_left = false;
@@ -3308,7 +3328,7 @@ void VR::process_snapturn() {
         controller_rot.y += turn_degrees;
         controller->set_control_rotation(controller_rot);
     }
-        
+
     m_snapturn_on_frame = false;
 }
 
@@ -3316,12 +3336,12 @@ void VR::update_statistics_overlay(sdk::UGameEngine* engine) {
     if (engine == nullptr) {
         return;
     }
-    
+
     if (m_show_fps_state != m_show_fps->value()) {
         engine->exec(L"stat fps");
         m_show_fps_state = m_show_fps->value();
     }
-    
+
     if (m_show_statistics_state != m_show_statistics->value()) {
         engine->exec(L"stat unit");
         m_show_statistics_state = m_show_statistics->value();

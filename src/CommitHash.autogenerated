@@ -1,0 +1,9 @@
+#pragma once 
+#define UEVR_COMMIT_HASH "fb3fdd8f4ed79714a9041a4faa0c6ac4da3f3743" 
+#define UEVR_TAG "1.0601" 
+#define UEVR_TAG_LONG "1.0601" 
+#define UEVR_COMMITS_PAST_TAG 42 
+#define UEVR_BRANCH "master" 
+#define UEVR_TOTAL_COMMITS 1296 
+#define UEVR_BUILD_DATE "16.02.2025" 
+#define UEVR_BUILD_TIME "04:23" 

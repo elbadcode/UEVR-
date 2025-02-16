@@ -758,6 +758,7 @@ list(APPEND uevr_SOURCES
 	"src/LicenseStrings.hpp"
 	"src/Mod.hpp"
 	"src/Mods.hpp"
+	"src/ReShadeAddon.hpp"
 	"src/WindowFilter.hpp"
 	"src/hooks/D3D11Hook.hpp"
 	"src/hooks/D3D12Hook.hpp"
