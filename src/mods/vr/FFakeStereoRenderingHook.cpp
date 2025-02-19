@@ -105,13 +105,6 @@ void FFakeStereoRenderingHook::on_frame() {
     attempt_hook_slate_thread();
     attempt_hook_fsceneview_constructor();
 
-    // TODO: see if this can be threaded; it might not be able to because of TLS or something
-    if (!VR::get()->should_skip_uobjectarray_init()) {
-        sdk::FName::get_constructor();
-        sdk::FName::get_to_string();
-        sdk::FUObjectArray::get();
-    }
-
     // Ideally we want to do all hooking
     // from game engine tick. if it fails
     // we will fall back to doing it here.
@@ -233,6 +226,13 @@ void FFakeStereoRenderingHook::on_draw_ui() {
 void FFakeStereoRenderingHook::attempt_hooking() {
     if (m_finished_hooking || m_tried_hooking) {
         return;
+    }
+
+    // TODO: see if this can be threaded; it might not be able to because of TLS or something
+    if (!VR::get()->should_skip_uobjectarray_init()) {
+        sdk::FName::get_constructor();
+        sdk::FName::get_to_string();
+        sdk::FUObjectArray::get();
     }
 
     if (!m_injected_stereo_at_runtime) {
@@ -398,10 +398,16 @@ void FFakeStereoRenderingHook::attempt_hook_game_engine_tick(uintptr_t return_ad
         }
 
         return result;
-    });
+    }, safetyhook::InlineHook::StartDisabled);
 
     if (!m_tick_hook) {
         SPDLOG_ERROR("Failed to hook UGameEngine::Tick!");
+        return;
+    }
+
+    if (auto tick_hook_enable = m_tick_hook.enable(); !tick_hook_enable.has_value()) {
+        SPDLOG_ERROR("Failed to enable UGameEngine::Tick hook! {}", (int)tick_hook_enable.error().type);
+        return;
     }
 
     m_hooked_game_engine_tick = true;
@@ -467,11 +473,16 @@ void FFakeStereoRenderingHook::attempt_hook_slate_thread(uintptr_t return_addres
         SPDLOG_INFO("Found FSlateRHIRenderer::DrawWindow_RenderThread with alternative return address method: {:x}", *func);
     }
 
-    m_slate_thread_hook = safetyhook::create_inline((void*)*func, &FFakeStereoRenderingHook::slate_draw_window_render_thread);
+    m_slate_thread_hook = safetyhook::create_inline((void*)*func, &FFakeStereoRenderingHook::slate_draw_window_render_thread, safetyhook::InlineHook::StartDisabled);
     m_hooked_slate_thread = true;
 
     if (!m_slate_thread_hook) {
         SPDLOG_ERROR("Failed to hook FSlateRHIRenderer::DrawWindow_RenderThread!");
+        return;
+    }
+
+    if (auto enable_result = m_slate_thread_hook.enable(); !enable_result.has_value()) {
+        SPDLOG_ERROR("Failed to enable FSlateRHIRenderer::DrawWindow_RenderThread hook! {}", (int)enable_result.error().type);
         return;
     }
 
@@ -520,11 +531,19 @@ void FFakeStereoRenderingHook::attempt_hook_fsceneview_constructor() {
         return;
     }
 
-    g_hook->m_sceneview_data.constructor_hook = safetyhook::create_inline(*constructor, (uintptr_t)&sceneview_constructor);
+    g_hook->m_sceneview_data.constructor_hook = safetyhook::create_inline(*constructor, (uintptr_t)&sceneview_constructor, safetyhook::InlineHook::StartDisabled);
 
     if (!g_hook->m_sceneview_data.constructor_hook) {
         SPDLOG_ERROR("Failed to hook FSceneView::FSceneView constructor!");
+        return;
     }
+
+    if (auto enable_result = g_hook->m_sceneview_data.constructor_hook.enable(); !enable_result.has_value()) {
+        SPDLOG_ERROR("Failed to enable FSceneView::FSceneView constructor hook! {}", (int)enable_result.error().type);
+        return;
+    }
+
+    SPDLOG_INFO("Hooked FSceneView::FSceneView constructor!");
 }
 
 bool FFakeStereoRenderingHook::hook() {
@@ -1789,11 +1808,16 @@ bool FFakeStereoRenderingHook::hook_game_viewport_client() try {
         return false;
     }
 
-    m_gameviewportclient_draw_hook = safetyhook::create_inline((void*)*game_viewport_client_draw, &game_viewport_client_draw_hook);
+    m_gameviewportclient_draw_hook = safetyhook::create_inline((void*)*game_viewport_client_draw, &game_viewport_client_draw_hook, safetyhook::InlineHook::StartDisabled);
     m_has_game_viewport_client_draw_hook = true;
 
     if (!m_gameviewportclient_draw_hook) {
         SPDLOG_ERROR("Failed to hook UGameViewportClient::Draw!");
+        return false;
+    }
+
+    if (auto enable_result = m_gameviewportclient_draw_hook.enable(); !enable_result.has_value()) {
+        SPDLOG_ERROR("Failed to enable UGameViewportClient::Draw hook!");
         return false;
     }
 
@@ -2924,6 +2948,7 @@ void FFakeStereoRenderingHook::setup_viewpoint(ISceneViewExtension* extension, v
             return;
         }
 
+        // No need to StartDisabled on this because we're on the same thread.
         g_hook->m_localplayer_get_viewpoint_hook = safetyhook::create_inline(*caller, (uintptr_t)&localplayer_setup_viewpoint);
         
         if (!g_hook->m_localplayer_get_viewpoint_hook) {
@@ -7242,8 +7267,33 @@ bool VRRenderTargetManager_Base::allocate_render_target_texture(uintptr_t return
                         this->texture_create_insn_bytes.resize(decoded->Length);
                         memcpy(this->texture_create_insn_bytes.data(), (void*)ip, decoded->Length);
 
-                        this->texture_hook = safetyhook::create_mid((void*)post_call, &VRRenderTargetManager::texture_hook_callback);
-                        this->pre_texture_hook = safetyhook::create_mid((void*)ip, &VRRenderTargetManager::pre_texture_hook_callback);
+                        auto texture_hook_result = safetyhook::MidHook::create((void*)post_call, &VRRenderTargetManager::texture_hook_callback);
+
+                        if (!texture_hook_result.has_value()) {
+                            const auto e = texture_hook_result.error();
+
+                            if (e.type == safetyhook::MidHook::Error::BAD_ALLOCATION) {
+                                SPDLOG_ERROR("Failed to create post texture hook: BAD_ALLOCATION: {}", (uint8_t)e.allocator_error);
+                            } else {
+                                SPDLOG_ERROR("Failed to create post texture hook: BAD_INLINE_HOOK: {}", (uint8_t)e.inline_hook_error.type);
+                            }
+                        } else {
+                            this->texture_hook = std::move(texture_hook_result.value());
+                        }
+
+                        auto pre_texure_hook_result = safetyhook::MidHook::create((void*)ip, &VRRenderTargetManager::pre_texture_hook_callback);
+
+                        if (!pre_texure_hook_result.has_value()) {
+                            const auto e = pre_texure_hook_result.error();
+
+                            if (e.type == safetyhook::MidHook::Error::BAD_ALLOCATION) {
+                                SPDLOG_ERROR("Failed to create pre texture hook: BAD_ALLOCATION: {}", (uint8_t)e.allocator_error);
+                            } else {
+                                SPDLOG_ERROR("Failed to create pre texture hook: BAD_INLINE_HOOK: {}", (uint8_t)e.inline_hook_error.type);
+                            }
+                        } else {
+                            this->pre_texture_hook = std::move(pre_texure_hook_result.value());
+                        }
                         this->set_up_texture_hook = true;
 
                         return false;
